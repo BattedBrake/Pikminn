@@ -1,16 +1,21 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pikmin Scene</title>
+    <meta charset="utf-8" />
+    <title>Rock Pikmin - WebGL</title>
+    <script src="libs.js"></script>
+    <script src="main.js"></script>
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; }
-      canvas { display: block; width: 100%; height: 100%; background: black; }
+      body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+      #hint {
+        position: absolute; left: 12px; top: 12px; color: #fff;
+        background: rgba(20, 25, 40, 0.55); padding: 8px 12px;
+        border-radius: 8px; font-size: 13px; user-select: none;
+      }
     </style>
-    <script type="module" src="main.js"></script>
   </head>
   <body>
-    <canvas id="mycanvas"></canvas>
+    <canvas id="your_canvas" style="position: absolute; background-color: black"></canvas>
+    <div id="hint"><b>Rock Pikmin</b> &mdash; drag mouse = putar kamera, scroll = zoom</div>
   </body>
 </html>
