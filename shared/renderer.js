@@ -34,10 +34,12 @@ export function createScene(CANVAS) {
         varying vec3 vColor;
         varying vec3 vNormal;
         varying vec3 vFragPos;
+        varying vec3 vLocalPos;   // posisi di ruang objek: tekstur ikut menempel saat objek/kamera diputar
 
         void main(void) {
             vec4 worldPos = Mmatrix * vec4(position, 1.0);
             vFragPos = vec3(worldPos);
+            vLocalPos = position;
             vNormal = mat3(Mmatrix) * normal;
             vColor = color;
 
@@ -50,10 +52,37 @@ export function createScene(CANVAS) {
         varying vec3 vColor;
         varying vec3 vNormal;
         varying vec3 vFragPos;
+        varying vec3 vLocalPos;
 
         uniform vec3 lightPos;
         uniform vec3 uColor;
         uniform float uIsRough;
+        uniform float uUseVertexColor;   // 0 = pakai uColor, 1 = pakai warna per-vertex
+
+        // Material per objek (atur lewat setMaterial di renderer.js). Nilai < 0 = otomatis (ikut uIsRough).
+        uniform float uMatShininess;     // ketajaman kilap: kecil = kilap lebar & lembut, besar = titik kilap kecil & tajam
+        uniform float uMatSpecular;      // kekuatan kilap: 0 = tidak mengkilap sama sekali, 1 = kilap putih penuh
+        uniform float uMatTexture;       // kekuatan tekstur batu prosedural: 0 = mulus, 1 = penuh
+        uniform float uMatTexScale;      // kerapatan tekstur: makin besar makin halus/rapat polanya
+
+        // ---- noise 3D untuk tekstur batu (tanpa file gambar) ----
+        float hash(vec3 p) {
+            p = fract(p * 0.3183099 + 0.1);
+            p *= 17.0;
+            return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+        float noise(vec3 x) {
+            vec3 i = floor(x);
+            vec3 f = fract(x);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(mix(hash(i + vec3(0, 0, 0)), hash(i + vec3(1, 0, 0)), f.x),
+                           mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+                       mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x),
+                           mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+        }
+        float fbm(vec3 p) {   // 3 lapis noise: bercak besar + bintik sedang + butiran halus
+            return 0.5 * noise(p) + 0.3 * noise(p * 2.1) + 0.2 * noise(p * 4.3);
+        }
 
         const vec3 source_ambient_color  = vec3(1.0, 1.0, 1.0);
         const vec3 source_diffuse_color  = vec3(1.0, 1.0, 1.0);
@@ -70,16 +99,39 @@ export function createScene(CANVAS) {
                 N = normalize(N + vec3(bumpX, bumpY, bumpZ));
             }
 
+            // Tekstur batu: permukaan dibuat bergelombang kecil (normal digeser mengikuti noise)
+            float pola = 0.5;
+            if (uMatTexture > 0.0) {
+                vec3 q = vLocalPos * uMatTexScale;
+                pola = fbm(q);
+                float e = 0.15;
+                vec3 grad = vec3(fbm(q + vec3(e, 0, 0)) - pola,
+                                 fbm(q + vec3(0, e, 0)) - pola,
+                                 fbm(q + vec3(0, 0, e)) - pola) / e;
+                N = normalize(N - grad * 0.25 * uMatTexture);
+            }
+
             vec3 L = normalize(lightPos - vFragPos);
 
             vec3 ambient_color  = mix(vec3(0.4), vec3(0.5), uIsRough);
             vec3 diffuse_color  = mix(vec3(0.6), vec3(0.5), uIsRough);
             vec3 specular_color = mix(vec3(0.8), vec3(0.15), uIsRough);
             float shininess     = mix(64.0, 12.0, uIsRough);
+            if (uMatShininess > 0.0) shininess = uMatShininess;
+            if (uMatSpecular >= 0.0) specular_color = vec3(uMatSpecular);
 
-            vec3 ambient = source_ambient_color * ambient_color * uColor;
+            vec3 baseColor = mix(uColor, vColor, uUseVertexColor);
+
+            // Tekstur batu: bercak gelap-terang + bintik mineral kecil yang sedikit lebih terang
+            if (uMatTexture > 0.0) {
+                float bintik = step(0.82, noise(vLocalPos * uMatTexScale * 6.0));
+                baseColor *= mix(1.0, 0.55 + 0.9 * pola, uMatTexture);
+                baseColor += bintik * 0.12 * uMatTexture;
+            }
+
+            vec3 ambient = source_ambient_color * ambient_color * baseColor;
             float lambert = max(dot(N, L), 0.0);
-            vec3 diffuse = source_diffuse_color * diffuse_color * lambert * uColor;
+            vec3 diffuse = source_diffuse_color * diffuse_color * lambert * baseColor;
 
             vec3 V = normalize(cameraPos - vFragPos);
             vec3 R = reflect(-L, N);
@@ -125,6 +177,11 @@ export function createScene(CANVAS) {
         lightPos: GL.getUniformLocation(SHADER_PROGRAM, "lightPos"),
         uColor: GL.getUniformLocation(SHADER_PROGRAM, "uColor"),
         uIsRough: GL.getUniformLocation(SHADER_PROGRAM, "uIsRough"),
+        uUseVertexColor: GL.getUniformLocation(SHADER_PROGRAM, "uUseVertexColor"),
+        uMatShininess: GL.getUniformLocation(SHADER_PROGRAM, "uMatShininess"),
+        uMatSpecular: GL.getUniformLocation(SHADER_PROGRAM, "uMatSpecular"),
+        uMatTexture: GL.getUniformLocation(SHADER_PROGRAM, "uMatTexture"),
+        uMatTexScale: GL.getUniformLocation(SHADER_PROGRAM, "uMatTexScale"),
     };
 
     GL.enableVertexAttribArray(shaderVars.position);
@@ -195,6 +252,8 @@ export function createScene(CANVAS) {
 
             // Reset default tiap frame (modul bisa menimpa sendiri)
             GL.uniform1f(shaderVars.uIsRough, 0.0);
+            GL.uniform1f(shaderVars.uUseVertexColor, 0.0);
+            resetMaterial(GL, shaderVars);
 
             // 3. Rotasi mouse
             var MOUSE_ROT = LIBS.get_I4();
@@ -214,12 +273,28 @@ export function createScene(CANVAS) {
     return { GL, CANVAS, shaderVars, run };
 }
 
-// Geser objek ke posisi (x, y, z) relatif terhadap matriks parent.
-// Pakai ini di scene gabungan supaya karakter tidak bertumpuk di titik (0, 0, 0).
-export function place(parent, x, y, z) {
+// Geser objek ke posisi (x, y, z) relatif terhadap matriks parent, dengan skala s (opsional, default 1).
+// Pakai ini di scene gabungan supaya karakter tidak bertumpuk di titik (0, 0, 0) dan ukurannya seimbang.
+export function place(parent, x, y, z, s = 1) {
     var T = LIBS.get_I4();
+    LIBS.scale(T, s, s, s);
     LIBS.set_position(T, x, y, z);
     var out = LIBS.get_I4();
     LIBS.multiply(out, parent, T);
     return out;
+}
+
+// ---------- Material per objek ----------
+// Panggil sebelum menggambar sebuah bagian, lalu resetMaterial sesudahnya supaya objek lain tidak ikut berubah.
+//   setMaterial(GL, shaderVars, { kilap: 20, kekuatanKilap: 0.25, tekstur: 0.6, skalaTekstur: 6 });
+// Bagian yang tidak diisi memakai nilai otomatis (kilap & kekuatanKilap ikut uIsRough, tekstur mati).
+export function setMaterial(GL, shaderVars, m) {
+    GL.uniform1f(shaderVars.uMatShininess, m.kilap !== undefined ? m.kilap : -1);
+    GL.uniform1f(shaderVars.uMatSpecular, m.kekuatanKilap !== undefined ? m.kekuatanKilap : -1);
+    GL.uniform1f(shaderVars.uMatTexture, m.tekstur !== undefined ? m.tekstur : 0);
+    GL.uniform1f(shaderVars.uMatTexScale, m.skalaTekstur !== undefined ? m.skalaTekstur : 4);
+}
+
+export function resetMaterial(GL, shaderVars) {
+    setMaterial(GL, shaderVars, {});
 }

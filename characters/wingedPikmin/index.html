@@ -7,10 +7,17 @@
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; }
       canvas { display: block; width: 100%; height: 100%; background: black; }
+      #pilih-pose { position: fixed; top: 12px; left: 12px; display: flex; gap: 6px; font-family: sans-serif; }
+      #pilih-pose button { padding: 6px 14px; border: 1px solid #555; border-radius: 6px; background: #fff; cursor: pointer; }
+      #pilih-pose button.aktif { background: #d6338a; border-color: #d6338a; color: #fff; }
     </style>
     <script type="module" src="main.js"></script>
   </head>
   <body>
     <canvas id="mycanvas"></canvas>
+    <div id="pilih-pose">
+      <button data-pose="normal">Normal</button>
+      <button data-pose="terbang">Terbang</button>
+    </div>
   </body>
 </html>

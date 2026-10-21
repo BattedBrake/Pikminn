@@ -1,16 +1,6 @@
 import { LIBS } from "../../shared/libs.js";
-import * as builder from "../../shared/builders.js";
+import * as builder from "../../shared/buildersWinged.js";
 
-/*
- * TEMPLATE KARAKTER — salin folder _template, ganti nama folder & class.
- *
- * Interface wajib (supaya bisa digabung di index.html terluar):
- *   constructor(GL)
- *   render(shaderVars, parentMatrix, time)
- *
- * Semua matriks bagian tubuh WAJIB dikalikan dengan parentMatrix,
- * supaya karakter bisa dipindah posisinya di scene gabungan.
- */
 export class Template {
     constructor(GL) {
         this.gl = GL;

@@ -11,13 +11,30 @@ Pikminn/
 │   ├── builders.js             ← generator mesh
 │   └── csg.js
 ├── environment/
-│   └── Environment.js          ← tanah & pohon
+│   ├── Environment.js          ← tanah pasir bergelombang + tinggiTanah(x, z)
+│   ├── sun.js
+│   ├── EnvModel.js             ← penyusun model dari beberapa bagian (pengganti THREE.Group)
+│   ├── chest.js, skeletonKey.js, kopdes.js
+│   └── (bentuk dasar: shared/buildersEnv.js → box, cylinder, sphere, torus, plane, limasanRoof)
 └── characters/
     ├── _template/              ← salin ini untuk karakter baru
+    ├── redPikmin/
+    │   ├── index.html / main.js   ← tes karakter ini saja
+    │   ├── RedPikmin.js           ← class karakter
+    │   ├── MyObject.js, config.js
+    │   ├── bodyParts/             ← HeadAndBody, Antenna, Limbs
+    │   └── animation/             ← Jalan, GoyangTangkai, TutupMata
+    ├── rockPikmin/
+    │   ├── index.html / main.js   ← tes karakter ini saja
+    │   ├── RockPikmin.js          ← class karakter
+    │   ├── config.js, matrix.js, draw.js
+    │   ├── bodyParts/             ← Body (batu + mata), Antenna (tangkai + daun), Limbs
+    │   └── animation/             ← Idle (goyang tangkai, pose idle)
     └── wingedPikmin/
         ├── index.html / main.js   ← tes karakter ini saja
         ├── WingedPikmin.js        ← class karakter
-        └── bodyParts/
+        ├── bodyParts/
+        └── animation/             ← (masih kosong, lihat README di dalamnya)
 ```
 
 ## Cara menjalankan

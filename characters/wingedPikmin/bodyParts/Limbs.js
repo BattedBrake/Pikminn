@@ -1,4 +1,5 @@
 import { LIBS } from '../../../shared/libs.js';
+import { T, S, RX, RY, RZ, mul } from '../matrix.js';
 
 export class Limbs {
     constructor(gl, handMesh, sphereMesh, fingerMesh) {
@@ -32,98 +33,89 @@ export class Limbs {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.fingerMesh.faces), gl.STATIC_DRAW);
     }
 
-    render(shaderVars, mouseRot) {
+    // bodyMatrix = sendi badan (tangan & kaki menempel ke badan)
+    // pose.lengan = { angkat, ayun, siku }, pose.kaki = { ayun }  (radian, 0 = pose berdiri asli)
+    render(shaderVars, bodyMatrix, pose) {
         const GL = this.gl;
         const STRIDE = 4 * 9;
 
         GL.uniform1f(shaderVars.uIsRough, 1.0);
         GL.uniform3f(shaderVars.uColor, 0.92, 0.22, 0.58);
 
+        const bindMesh = (vb, ib) => {
+            GL.bindBuffer(GL.ARRAY_BUFFER, vb);
+            GL.vertexAttribPointer(shaderVars.position, 3, GL.FLOAT, false, STRIDE, 0);
+            GL.vertexAttribPointer(shaderVars.normal, 3, GL.FLOAT, false, STRIDE, 4 * 3);
+            GL.vertexAttribPointer(shaderVars.color, 3, GL.FLOAT, false, STRIDE, 4 * 6);
+            GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, ib);
+        };
+        const drawHand = (M) => {
+            GL.uniformMatrix4fv(shaderVars.mMmatrix, false, M);
+            GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
+        };
+        // Bola penutup sendi (radius r). sphereMesh berukuran 1.2 x 1.0 x 1.2, jadi x & z dibagi 1.2
+        const drawJoint = (M, r) => {
+            GL.uniformMatrix4fv(shaderVars.mMmatrix, false, mul(M, S(r / 1.2, r, r / 1.2)));
+            GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
+        };
+
+        var lengan = pose.lengan, kaki = pose.kaki;
+
         // =========================================================
-        // 1. BIND BUFFER LENGAN UTAMA & KAKI
+        // 1. RANTAI SENDI: badan -> bahu -> lengan atas -> siku -> lengan bawah
+        //                  badan -> pinggul -> kaki
+        // Pivot setiap sendi ada di pangkal mesh-nya, jadi saat diputar pangkalnya tetap menempel.
         // =========================================================
-        GL.bindBuffer(GL.ARRAY_BUFFER, this.handVB);
-        GL.vertexAttribPointer(shaderVars.position, 3, GL.FLOAT, false, STRIDE, 0);
-        GL.vertexAttribPointer(shaderVars.normal, 3, GL.FLOAT, false, STRIDE, 4 * 3);
-        GL.vertexAttribPointer(shaderVars.color, 3, GL.FLOAT, false, STRIDE, 4 * 6);
-        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.handIB);
+        const BAHU = [0.35, -0.75, 0];
+        const SIKU = [0.8, -0.3, 0.15];          // posisi siku di dalam ruang lengan atas
+        const PINGGUL = [0.18, -1.7, 0.1];
 
         // --- TANGAN KANAN ---
-        var LOCAL_HAND_RIGHT = LIBS.get_I4();
-        LIBS.translateX(LOCAL_HAND_RIGHT, 0.35);   
-        LIBS.translateY(LOCAL_HAND_RIGHT, -0.75);  
-        LIBS.rotateZ(LOCAL_HAND_RIGHT, -Math.PI / 12); 
+        var BAHU_KANAN = mul(bodyMatrix, T(BAHU[0], BAHU[1], BAHU[2]), RX(lengan.ayun), RZ(lengan.angkat));
+        var FINAL_HAND_RIGHT = mul(BAHU_KANAN, RZ(-Math.PI / 12));
+        var SIKU_KANAN = mul(FINAL_HAND_RIGHT, T(SIKU[0], SIKU[1], SIKU[2]), RY(-lengan.siku));
+        var FINAL_RIGHT_FOREARM = mul(SIKU_KANAN, S(0.4, 0.4, 0.3));
 
-        var FINAL_HAND_RIGHT = LIBS.get_I4();
-        LIBS.multiply(FINAL_HAND_RIGHT, mouseRot, LOCAL_HAND_RIGHT);
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_HAND_RIGHT);
-        GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
+        // --- TANGAN KIRI (cermin dari kanan) ---
+        var BAHU_KIRI = mul(bodyMatrix, T(-BAHU[0], BAHU[1], BAHU[2]), RX(lengan.ayun), RZ(-lengan.angkat));
+        var FINAL_HAND_LEFT = mul(BAHU_KIRI, RZ(Math.PI / 12), S(-1.0, 1.0, 1.0));
+        var SIKU_KIRI = mul(FINAL_HAND_LEFT, T(SIKU[0], SIKU[1], SIKU[2]), RY(-lengan.siku));
+        var FINAL_LEFT_FOREARM = mul(SIKU_KIRI, S(0.4, 0.4, 0.3));
 
-        // --- FOREARM KANAN ---
-        var LOCAL_RIGHT_FOREARM = LIBS.get_I4();
-        LIBS.translateX(LOCAL_RIGHT_FOREARM, 0.8);
-        LIBS.translateY(LOCAL_RIGHT_FOREARM, -0.3); 
-        LIBS.translateZ(LOCAL_RIGHT_FOREARM, 0.15);
-        LIBS.scale(LOCAL_RIGHT_FOREARM, 0.4, 0.4, 0.3);
+        // --- KAKI (rotasi & skala asli, lalu ayunan di pinggul) ---
+        var BENTUK_KAKI_KANAN = LIBS.get_I4();
+        LIBS.scale(BENTUK_KAKI_KANAN, 0.75, 1, 1);
+        LIBS.rotateY(BENTUK_KAKI_KANAN, -Math.PI / 6);
+        LIBS.rotateX(BENTUK_KAKI_KANAN, Math.PI / 3);
+        LIBS.rotateZ(BENTUK_KAKI_KANAN, -Math.PI / 8);
+        var PINGGUL_KANAN = mul(bodyMatrix, T(PINGGUL[0], PINGGUL[1], PINGGUL[2]), RX(kaki.ayun));
+        var FINAL_LEG_RIGHT = mul(PINGGUL_KANAN, BENTUK_KAKI_KANAN);
 
-        var FINAL_RIGHT_FOREARM = LIBS.get_I4();
-        LIBS.multiply(FINAL_RIGHT_FOREARM, FINAL_HAND_RIGHT, LOCAL_RIGHT_FOREARM);
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_RIGHT_FOREARM);
-        GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
+        var BENTUK_KAKI_KIRI = LIBS.get_I4();
+        LIBS.scale(BENTUK_KAKI_KIRI, -0.75, 1, 1);
+        LIBS.rotateY(BENTUK_KAKI_KIRI, Math.PI / 6);
+        LIBS.rotateX(BENTUK_KAKI_KIRI, Math.PI / 3);
+        LIBS.rotateZ(BENTUK_KAKI_KIRI, Math.PI / 8);
+        var PINGGUL_KIRI = mul(bodyMatrix, T(-PINGGUL[0], PINGGUL[1], PINGGUL[2]), RX(kaki.ayun));
+        var FINAL_LEG_LEFT = mul(PINGGUL_KIRI, BENTUK_KAKI_KIRI);
 
-        // --- TANGAN KIRI ---
-        var LOCAL_HAND_LEFT = LIBS.get_I4();
-        LIBS.translateX(LOCAL_HAND_LEFT, -0.35);  
-        LIBS.translateY(LOCAL_HAND_LEFT, -0.75);
-        LIBS.scale(LOCAL_HAND_LEFT, -1.0, 1.0, 1.0); 
-        LIBS.rotateZ(LOCAL_HAND_LEFT, Math.PI / 12);
+        // Gambar lengan atas, lengan bawah, dan kaki
+        bindMesh(this.handVB, this.handIB);
+        drawHand(FINAL_HAND_RIGHT);
+        drawHand(FINAL_RIGHT_FOREARM);
+        drawHand(FINAL_HAND_LEFT);
+        drawHand(FINAL_LEFT_FOREARM);
+        drawHand(FINAL_LEG_RIGHT);
+        drawHand(FINAL_LEG_LEFT);
 
-        var FINAL_HAND_LEFT = LIBS.get_I4();
-        LIBS.multiply(FINAL_HAND_LEFT, mouseRot, LOCAL_HAND_LEFT);
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_HAND_LEFT);
-        GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
-
-        // --- FOREARM KIRI ---
-        var LOCAL_LEFT_FOREARM = LIBS.get_I4();
-        LIBS.translateX(LOCAL_LEFT_FOREARM, 0.8);
-        LIBS.translateY(LOCAL_LEFT_FOREARM, -0.3);
-        LIBS.translateZ(LOCAL_LEFT_FOREARM, 0.15);
-        LIBS.scale(LOCAL_LEFT_FOREARM, 0.4, 0.4, 0.3);
-
-        var FINAL_LEFT_FOREARM = LIBS.get_I4();
-        LIBS.multiply(FINAL_LEFT_FOREARM, FINAL_HAND_LEFT, LOCAL_LEFT_FOREARM);
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_LEFT_FOREARM);
-        GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
-
-        // --- KAKI KANAN ---
-        var LOCAL_LEG_RIGHT = LIBS.get_I4();
-        LIBS.translateX(LOCAL_LEG_RIGHT, 0.18);
-        LIBS.translateY(LOCAL_LEG_RIGHT, -1.7);
-        LIBS.translateZ(LOCAL_LEG_RIGHT, 0.1);
-        LIBS.scale(LOCAL_LEG_RIGHT, 0.75, 1, 1);
-        LIBS.rotateY(LOCAL_LEG_RIGHT, -Math.PI / 6);
-        LIBS.rotateX(LOCAL_LEG_RIGHT, Math.PI / 3);
-        LIBS.rotateZ(LOCAL_LEG_RIGHT, -Math.PI / 8);
-
-        var FINAL_LEG_RIGHT = LIBS.get_I4();
-        LIBS.multiply(FINAL_LEG_RIGHT, mouseRot, LOCAL_LEG_RIGHT);
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_LEG_RIGHT);
-        GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
-
-        // --- KAKI KIRI ---
-        var LOCAL_LEG_LEFT = LIBS.get_I4();
-        LIBS.translateX(LOCAL_LEG_LEFT, -0.18);
-        LIBS.translateY(LOCAL_LEG_LEFT, -1.7);
-        LIBS.translateZ(LOCAL_LEG_LEFT, 0.1);
-        LIBS.scale(LOCAL_LEG_LEFT, -0.75, 1, 1);
-        LIBS.rotateY(LOCAL_LEG_LEFT, Math.PI / 6);
-        LIBS.rotateX(LOCAL_LEG_LEFT, Math.PI / 3);
-        LIBS.rotateZ(LOCAL_LEG_LEFT, Math.PI / 8);
-
-        var FINAL_LEG_LEFT = LIBS.get_I4();
-        LIBS.multiply(FINAL_LEG_LEFT, mouseRot, LOCAL_LEG_LEFT);
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_LEG_LEFT);
-        GL.drawElements(GL.TRIANGLES, this.handMesh.faces.length, GL.UNSIGNED_SHORT, 0);
+        // Tambalan sendi: bola di bahu, siku, dan pinggul supaya tidak terlihat lepas saat diputar
+        bindMesh(this.sphereVB, this.sphereIB);
+        drawJoint(BAHU_KANAN, 0.2);
+        drawJoint(BAHU_KIRI, 0.2);
+        drawJoint(SIKU_KANAN, 0.09);
+        drawJoint(SIKU_KIRI, 0.09);
+        drawJoint(PINGGUL_KANAN, 0.17);
+        drawJoint(PINGGUL_KIRI, 0.17);
 
 
         // =========================================================

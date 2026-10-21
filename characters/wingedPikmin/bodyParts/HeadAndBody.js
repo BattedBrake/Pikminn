@@ -14,7 +14,8 @@ export class HeadAndBody {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(sphereMesh.faces), gl.STATIC_DRAW);
     }
 
-    render(shaderVars, mouseRot) {
+    // headMatrix = sendi kepala (kepala & mata), bodyMatrix = sendi badan
+    render(shaderVars, headMatrix, bodyMatrix) {
         const GL = this.gl;
         const STRIDE = 4 * 9;
 
@@ -26,7 +27,7 @@ export class HeadAndBody {
 
         // --- KEPALA ---
         var MATRIX_OVAL_1 = LIBS.get_I4();
-        LIBS.multiply(MATRIX_OVAL_1, mouseRot, LIBS.get_I4());
+        LIBS.multiply(MATRIX_OVAL_1, headMatrix, LIBS.get_I4());
         GL.uniform3f(shaderVars.uColor, 0.92, 0.22, 0.58);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, MATRIX_OVAL_1);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
@@ -37,7 +38,7 @@ export class HeadAndBody {
         LIBS.translateY(LOCAL_OVAL_2, -1.2);
         LIBS.scale(LOCAL_OVAL_2, 0.6, 0.9, 0.6); 
         var FINAL_OVAL_2 = LIBS.get_I4();
-        LIBS.multiply(FINAL_OVAL_2, mouseRot, LOCAL_OVAL_2);
+        LIBS.multiply(FINAL_OVAL_2, bodyMatrix, LOCAL_OVAL_2);
         GL.uniform3f(shaderVars.uColor, 0.92, 0.22, 0.58);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_OVAL_2);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
@@ -48,7 +49,7 @@ export class HeadAndBody {
         LIBS.translateZ(LOCAL_OVAL_3, -0.3);
         LIBS.scale(LOCAL_OVAL_3, 0.3, 0.3, 0.3);
         var FINAL_OVAL_3 = LIBS.get_I4();
-        LIBS.multiply(FINAL_OVAL_3, mouseRot, LOCAL_OVAL_3);
+        LIBS.multiply(FINAL_OVAL_3, bodyMatrix, LOCAL_OVAL_3);
         GL.uniform3f(shaderVars.uColor, 0.92, 0.22, 0.58);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_OVAL_3);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
@@ -59,7 +60,7 @@ export class HeadAndBody {
         LIBS.translateZ(LOCAL_OVAL_4, -0.3);
         LIBS.scale(LOCAL_OVAL_4, 0.3, 0.3, 0.3);
         var FINAL_OVAL_4 = LIBS.get_I4();
-        LIBS.multiply(FINAL_OVAL_4, mouseRot, LOCAL_OVAL_4);
+        LIBS.multiply(FINAL_OVAL_4, bodyMatrix, LOCAL_OVAL_4);
         GL.uniform3f(shaderVars.uColor, 0.92, 0.22, 0.58);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_OVAL_4);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
@@ -70,7 +71,7 @@ export class HeadAndBody {
         LIBS.translateZ(LOCAL_OVAL_5, 0);
         LIBS.scale(LOCAL_OVAL_5, 0.6, 0.6, 0.6);
         var FINAL_OVAL_5 = LIBS.get_I4();
-        LIBS.multiply(FINAL_OVAL_5, mouseRot, LOCAL_OVAL_5);
+        LIBS.multiply(FINAL_OVAL_5, bodyMatrix, LOCAL_OVAL_5);
         GL.uniform3f(shaderVars.uColor, 1.0, 0.10, 0.90);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_OVAL_5);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
@@ -83,7 +84,7 @@ export class HeadAndBody {
         LIBS.translateZ(LOCAL_OVAL_MATA1, 1.2);
         LIBS.scale(LOCAL_OVAL_MATA1, 0.5, 0.565, 0.1);
         var FINAL_OVAL_MATA1 = LIBS.get_I4();
-        LIBS.multiply(FINAL_OVAL_MATA1, mouseRot, LOCAL_OVAL_MATA1);
+        LIBS.multiply(FINAL_OVAL_MATA1, headMatrix, LOCAL_OVAL_MATA1);
         GL.uniform3f(shaderVars.uColor, 0.28, 0.78, 0.92);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_OVAL_MATA1);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);
@@ -95,7 +96,7 @@ export class HeadAndBody {
         LIBS.translateZ(LOCAL_OVAL_MATA2, 1.2);
         LIBS.scale(LOCAL_OVAL_MATA2, 0.5, 0.565, 0.1); 
         var FINAL_OVAL_MATA2 = LIBS.get_I4();
-        LIBS.multiply(FINAL_OVAL_MATA2, mouseRot, LOCAL_OVAL_MATA2);
+        LIBS.multiply(FINAL_OVAL_MATA2, headMatrix, LOCAL_OVAL_MATA2);
         GL.uniform3f(shaderVars.uColor, 0.28, 0.78, 0.92);
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_OVAL_MATA2);
         GL.drawElements(GL.TRIANGLES, this.sphereMesh.faces.length, GL.UNSIGNED_SHORT, 0);

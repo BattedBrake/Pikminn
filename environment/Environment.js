@@ -1,176 +1,91 @@
 import { LIBS } from '../shared/libs.js';
 
+// 💡 1. Buat fungsi helper untuk menghitung tinggi tanah (Y) berdasarkan posisi X dan Z
+export function tinggiTanah(x, z) {
+    // Rumus ini HARUS SAMA PERSIS dengan rumus yPos di dalam generateWavyDesert
+    return -3.75 + Math.sin(x * 0.4) * Math.cos(z * 0.4) * 0.6;
+}
+
 export class Environment {
     constructor(gl) {
         this.gl = gl;
+    
+        var planeData = this.generateWavyDesert(40, 40, 50); 
 
-        // 1. Buat Ground (Tanah)
-        var groundData = this.generatePlane(40.0, 40.0);
-        this.groundVB = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.groundVB);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(groundData.vertices), gl.STATIC_DRAW);
-        this.groundIB = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.groundIB);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(groundData.faces), gl.STATIC_DRAW);
-        this.groundCount = groundData.faces.length;
+        this.envVB = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.envVB);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(planeData.vertices), gl.STATIC_DRAW);
 
-        // 2. Buat Prototype Pohon (Batang Silinder & Daun Bola)
-        var trunkData = this.generateCylinder(0.4, 7.5, 12); // Batang
-        var leavesData = this.generateSphere(1.8, 16, 12);   // Daun
-
-        // Buffer Batang
-        this.trunkVB = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.trunkVB);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(trunkData.vertices), gl.STATIC_DRAW);
-        this.trunkIB = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.trunkIB);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(trunkData.faces), gl.STATIC_DRAW);
-        this.trunkCount = trunkData.faces.length;
-
-        // Buffer Daun
-        this.leavesVB = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.leavesVB);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(leavesData.vertices), gl.STATIC_DRAW);
-        this.leavesIB = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.leavesIB);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(leavesData.faces), gl.STATIC_DRAW);
-        this.leavesCount = leavesData.faces.length;
+        this.envIB = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.envIB);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(planeData.faces), gl.STATIC_DRAW);
+        
+        this.indexCount = planeData.faces.length;
     }
 
-    // Helper: Buat Ground Datar
-    generatePlane(width, depth) {
+    generateWavyDesert(width, depth, resolution) {
         var vertices = [];
         var faces = [];
-        var yPos = -4.2; // Pas di bawah kaki karakter
         var halfW = width / 2;
         var halfD = depth / 2;
+        var dx = width / resolution;
+        var dz = depth / resolution;
 
-        vertices.push(
-            -halfW, yPos, -halfD,  0, 1, 0,  0.22, 0.55, 0.22, // Hijau rumput
-             halfW, yPos, -halfD,  0, 1, 0,  0.22, 0.55, 0.22,
-             halfW, yPos,  halfD,  0, 1, 0,  0.22, 0.55, 0.22,
-            -halfW, yPos,  halfD,  0, 1, 0,  0.22, 0.55, 0.22
-        );
-        faces.push(0, 1, 2);
-        faces.push(0, 2, 3);
+        // 1. Buat Grid Vertices dengan Tinggi (Y) Bergelombang
+        for (let z = 0; z <= resolution; z++) {
+            let zPos = -halfD + z * dz;
+            for (let x = 0; x <= resolution; x++) {
+                let xPos = -halfW + x * dx;
+
+                // Memanggil fungsi tinggiTanah agar rumusnya terpusat dan konsisten
+                let yPos = tinggiTanah(xPos, zPos); 
+
+                // Warna pasir gurun (Kecokelatan / Oranye Keemasan)
+                let r = 0.85, g = 0.65, b = 0.35; 
+                let nx = 0, ny = 1, nz = 0; // Normal menghadap atas
+
+                vertices.push(xPos, yPos, zPos, nx, ny, nz, r, g, b);
+            }
+        }
+
+        // 2. Hubungkan Titik-titik Menjadi Kotak (Faces / Triangles)
+        for (let z = 0; z < resolution; z++) {
+            for (let x = 0; x < resolution; x++) {
+                let i0 = z * (resolution + 1) + x;
+                let i1 = i0 + 1;
+                let i2 = (z + 1) * (resolution + 1) + x;
+                let i3 = i2 + 1;
+
+                // Segitiga 1
+                faces.push(i0, i2, i1);
+                // Segitiga 2
+                faces.push(i1, i2, i3);
+            }
+        }
+
         return { vertices, faces };
     }
 
-    // Helper: Buat Batang Pohon (Silinder Sederhana)
-    generateCylinder(radius, height, radialSegments) {
-        var vertices = [];
-        var faces = [];
-        for (let i = 0; i <= 1; i++) {
-            let y = i * height - 4.2; // Mulai dari lantai
-            let r = radius;
-            for (let j = 0; j <= radialSegments; j++) {
-                let theta = (j / radialSegments) * Math.PI * 2;
-                let x = Math.cos(theta) * r;
-                let z = Math.sin(theta) * r;
-                let nx = Math.cos(theta), ny = 0, nz = Math.sin(theta);
-                vertices.push(x, y, z, nx, ny, nz, 0.45, 0.28, 0.12); // Warna Cokelat Kayu
-            }
-        }
-        for (let j = 0; j < radialSegments; j++) {
-            let first = j;
-            let second = first + radialSegments + 1;
-            faces.push(first, second, first + 1);
-            faces.push(second, second + 1, first + 1);
-        }
-        return { vertices, faces };
-    }
-
-    // Helper: Buat Daun Pohon (Bola Sederhana)
-    generateSphere(radius, rings, sectors) {
-        var vertices = [];
-        var faces = [];
-        for (let r = 0; r <= rings; r++) {
-            let v = r / rings;
-            let phi = v * Math.PI;
-            for (let s = 0; s <= sectors; s++) {
-                let u = s / sectors;
-                let theta = u * Math.PI * 2;
-                let x = radius * Math.sin(phi) * Math.cos(theta);
-                let y = radius * Math.cos(phi);
-                let z = radius * Math.sin(phi) * Math.sin(theta);
-                let nx = x / radius, ny = y / radius, nz = z / radius;
-                vertices.push(x, y, z, nx, ny, nz, 0.15, 0.45, 0.2); // Warna Hijau Daun
-            }
-        }
-        for (let r = 0; r < rings; r++) {
-            for (let s = 0; s < sectors; s++) {
-                let first = r * (sectors + 1) + s;
-                let second = first + sectors + 1;
-                faces.push(first, second + 1, second);
-                faces.push(first, first + 1, second + 1);
-            }
-        }
-        return { vertices, faces };
-    }
-
-    // Fungsi Render Environment (Ground & Pohon di sekitar)
-    render(shaderVars, mouseRot) {
+    render(shaderVars, root) {
         const GL = this.gl;
         const STRIDE = 4 * 9;
 
-        GL.uniform1f(shaderVars.uRoughness, 1.0);
-        GL.uniform1f(shaderVars.uShininess, 8.0);
+        // Set material tanah (sedikit kasar agar efek cahayanya bagus)
+        GL.uniform1f(shaderVars.uRoughness, 0.8);
+        GL.uniform1f(shaderVars.uShininess, 200000000000000.0);
+        GL.uniform3f(shaderVars.uColor, 0.6, 0.50, 0.4);
 
-        // --- 1. RENDER GROUND ---
-        GL.uniform3f(shaderVars.uColor, 0.25, 0.55, 0.25);
-        GL.bindBuffer(GL.ARRAY_BUFFER, this.groundVB);
+        GL.bindBuffer(GL.ARRAY_BUFFER, this.envVB);
+        
+        // 💡 Diperbaiki syntax vertexAttribPointer-nya
         GL.vertexAttribPointer(shaderVars.position, 3, GL.FLOAT, false, STRIDE, 0);
         GL.vertexAttribPointer(shaderVars.normal, 3, GL.FLOAT, false, STRIDE, 4 * 3);
         GL.vertexAttribPointer(shaderVars.color, 3, GL.FLOAT, false, STRIDE, 4 * 6);
-        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.groundIB);
+        
+        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.envIB);
 
-        var GROUND_MATRIX = LIBS.get_I4();
-        LIBS.multiply(GROUND_MATRIX, mouseRot, LIBS.get_I4());
-        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, GROUND_MATRIX);
-        GL.drawElements(GL.TRIANGLES, this.groundCount, GL.UNSIGNED_SHORT, 0);
-
-        // --- 2. RENDER BEBERAPA POHON DI LATAR BELAKANG ---
-        // Array posisi pohon (X, Z) di sekeliling karakter
-        const treePositions = [
-            { x: -4.0, z: -5.0 },
-            { x: 5.0, z: -6.0 },
-            { x: -6.0, z: 3.0 },
-            { x: 6.0, z: 4.0 }
-        ];
-
-        for (let pos of treePositions) {
-            // A. Gambar Batang Pohon
-            GL.bindBuffer(GL.ARRAY_BUFFER, this.trunkVB);
-            GL.vertexAttribPointer(shaderVars.position, 3, GL.FLOAT, false, STRIDE, 0);
-            GL.vertexAttribPointer(shaderVars.normal, 3, GL.FLOAT, false, STRIDE, 4 * 3);
-            GL.vertexAttribPointer(shaderVars.color, 3, GL.FLOAT, false, STRIDE, 4 * 6);
-            GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.trunkIB);
-
-            var TRUNK_MATRIX = LIBS.get_I4();
-            LIBS.translateX(TRUNK_MATRIX, pos.x);
-            LIBS.translateZ(TRUNK_MATRIX, pos.z);
-            
-            var FINAL_TRUNK = LIBS.get_I4();
-            LIBS.multiply(FINAL_TRUNK, mouseRot, TRUNK_MATRIX);
-            GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_TRUNK);
-            GL.drawElements(GL.TRIANGLES, this.trunkCount, GL.UNSIGNED_SHORT, 0);
-
-            // B. Gambar Daun Pohon (Ditaruh di atas batang, Y = 1.2)
-            GL.bindBuffer(GL.ARRAY_BUFFER, this.leavesVB);
-            GL.vertexAttribPointer(shaderVars.position, 3, GL.FLOAT, false, STRIDE, 0);
-            GL.vertexAttribPointer(shaderVars.normal, 3, GL.FLOAT, false, STRIDE, 4 * 3);
-            GL.vertexAttribPointer(shaderVars.color, 3, GL.FLOAT, false, STRIDE, 4 * 6);
-            GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, this.leavesIB);
-
-            var LEAVES_MATRIX = LIBS.get_I4();
-            LIBS.translateX(LEAVES_MATRIX, pos.x);
-            LIBS.translateY(LEAVES_MATRIX, 1.8); // Posisi daun di atas batang
-            LIBS.translateZ(LEAVES_MATRIX, pos.z);
-
-            var FINAL_LEAVES = LIBS.get_I4();
-            LIBS.multiply(FINAL_LEAVES, mouseRot, LEAVES_MATRIX);
-            GL.uniformMatrix4fv(shaderVars.mMmatrix, false, FINAL_LEAVES);
-            GL.drawElements(GL.TRIANGLES, this.leavesCount, GL.UNSIGNED_SHORT, 0);
-        }
+        // Render tanah sesuai matriks root scene
+        GL.uniformMatrix4fv(shaderVars.mMmatrix, false, root);
+        GL.drawElements(GL.TRIANGLES, this.indexCount, GL.UNSIGNED_SHORT, 0);
     }
 }
