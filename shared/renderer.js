@@ -11,8 +11,21 @@ import { LIBS } from "./libs.js";
  *   scene.run((shaderVars, root, time) => {
  *       pikmin.render(shaderVars, place(root, 0, 0, 0), time);
  *   });
+ *
+ * Mode kamera (opsi kedua):
+ *   createScene(canvas)                       -> kamera PUTAR: drag mouse memutar seluruh objek (default)
+ *   createScene(canvas, { kamera: "bebas" })  -> kamera BEBAS: jelajahi map
+ *       W / A / S / D   = maju / kiri / mundur / kanan
+ *       Space / Q       = naik,  Ctrl / E = turun
+ *       Shift (tahan)   = bergerak lebih cepat
+ *       Drag mouse      = melihat sekeliling (atau klik canvas lalu gerakkan mouse kalau kunciMouse: true; Esc untuk lepas)
+ *     Opsi tambahan kamera bebas:
+ *       posisiAwal: [x, y, z] (default [0, 0, 20]), arahAwal: derajat (default 0 = menghadap -z),
+ *       kecepatan: satuan per detik (default 8), tinggiMin: fungsi (x, z) -> y terendah kamera (supaya tidak menembus tanah),
+ *       jarakPandang: seberapa jauh objek masih terlihat (default 250), kunciMouse: true/false (default false)
  */
-export function createScene(CANVAS) {
+export function createScene(CANVAS, opsiScene = {}) {
+    var MODE_BEBAS = opsiScene.kamera === "bebas";
     CANVAS.width = window.innerWidth;
     CANVAS.height = window.innerHeight;
 
@@ -87,7 +100,7 @@ export function createScene(CANVAS) {
         const vec3 source_ambient_color  = vec3(1.0, 1.0, 1.0);
         const vec3 source_diffuse_color  = vec3(1.0, 1.0, 1.0);
         const vec3 source_specular_color = vec3(1.0, 1.0, 1.0);
-        const vec3 cameraPos = vec3(0.0, 0.0, 20.0);
+        uniform vec3 uCameraPos;   // posisi kamera di dunia (untuk kilap/specular)
 
         void main(void) {
             vec3 N = normalize(vNormal);
@@ -133,7 +146,7 @@ export function createScene(CANVAS) {
             float lambert = max(dot(N, L), 0.0);
             vec3 diffuse = source_diffuse_color * diffuse_color * lambert * baseColor;
 
-            vec3 V = normalize(cameraPos - vFragPos);
+            vec3 V = normalize(uCameraPos - vFragPos);
             vec3 R = reflect(-L, N);
             float spec = pow(max(dot(R, V), 0.0), shininess);
             vec3 specular = source_specular_color * specular_color * spec;
@@ -175,6 +188,7 @@ export function createScene(CANVAS) {
         Vmatrix: GL.getUniformLocation(SHADER_PROGRAM, "Vmatrix"),
         mMmatrix: GL.getUniformLocation(SHADER_PROGRAM, "Mmatrix"),
         lightPos: GL.getUniformLocation(SHADER_PROGRAM, "lightPos"),
+        uCameraPos: GL.getUniformLocation(SHADER_PROGRAM, "uCameraPos"),
         uColor: GL.getUniformLocation(SHADER_PROGRAM, "uColor"),
         uIsRough: GL.getUniformLocation(SHADER_PROGRAM, "uIsRough"),
         uUseVertexColor: GL.getUniformLocation(SHADER_PROGRAM, "uUseVertexColor"),
@@ -189,8 +203,33 @@ export function createScene(CANVAS) {
     GL.enableVertexAttribArray(shaderVars.color);
 
     /*=================== CAMERA & CONTROLS =================== */
-    var PROJMATRIX = LIBS.get_projection(40, CANVAS.width / CANVAS.height, 1, 100);
+    var JARAK_PANDANG = MODE_BEBAS ? (opsiScene.jarakPandang || 250) : 100;
+    var PROJMATRIX = LIBS.get_projection(40, CANVAS.width / CANVAS.height, 1, JARAK_PANDANG);
     var VIEWMATRIX = LIBS.get_I4();
+
+    // ---- Kamera bebas: posisi, arah (yaw = kiri-kanan, pitch = atas-bawah), dan tombol yang sedang ditekan ----
+    var kamPos = (opsiScene.posisiAwal || [0, 0, 20]).slice();
+    var kamYaw = (opsiScene.arahAwal || 0) * Math.PI / 180, kamPitch = 0;
+    var KECEPATAN = opsiScene.kecepatan || 8;
+    var tombol = {};
+    if (MODE_BEBAS) {
+        window.addEventListener("keydown", (e) => {
+            tombol[e.code] = true;
+            if (["Space", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) e.preventDefault();
+        });
+        window.addEventListener("keyup", (e) => { tombol[e.code] = false; });
+        window.addEventListener("blur", () => { tombol = {}; });   // jangan terus bergerak kalau jendela kehilangan fokus
+
+        // Kunci mouse (opsional): klik canvas, lalu mouse menggerakkan pandangan tanpa perlu drag
+        if (opsiScene.kunciMouse) {
+            CANVAS.addEventListener("click", () => { if (CANVAS.requestPointerLock) CANVAS.requestPointerLock(); });
+            document.addEventListener("mousemove", (e) => {
+                if (document.pointerLockElement !== CANVAS) return;
+                kamYaw += e.movementX * 0.0025;
+                kamPitch = Math.max(-1.5, Math.min(1.5, kamPitch + e.movementY * 0.0025));
+            });
+        }
+    }
 
     var THETA = 0, PHI = 0;
     var drag = false;
@@ -203,6 +242,14 @@ export function createScene(CANVAS) {
     CANVAS.addEventListener("mouseout", () => { drag = false; }, false);
     CANVAS.addEventListener("mousemove", (e) => {
         if (!drag) return;
+        if (MODE_BEBAS) {
+            // Kamera bebas: drag = melihat sekeliling (arah pandang mengikuti arah drag)
+            kamYaw += (e.pageX - x_prev) * 0.005;
+            kamPitch = Math.max(-1.5, Math.min(1.5, kamPitch + (e.pageY - y_prev) * 0.005));
+            x_prev = e.pageX; y_prev = e.pageY;
+            e.preventDefault();
+            return;
+        }
         dX = (e.pageX - x_prev) * 2 * Math.PI / CANVAS.width;
         dY = (e.pageY - y_prev) * 2 * Math.PI / CANVAS.height;
         THETA += dX; PHI += dY;
@@ -214,7 +261,7 @@ export function createScene(CANVAS) {
     window.addEventListener("resize", () => {
         CANVAS.width = window.innerWidth;
         CANVAS.height = window.innerHeight;
-        PROJMATRIX = LIBS.get_projection(40, CANVAS.width / CANVAS.height, 1, 100);
+        PROJMATRIX = LIBS.get_projection(40, CANVAS.width / CANVAS.height, 1, JARAK_PANDANG);
     });
 
     /*========================= DRAWING LOOP ========================= */
@@ -227,9 +274,13 @@ export function createScene(CANVAS) {
     // renderFn(shaderVars, MOUSE_ROT, TIME) dipanggil tiap frame
     var run = function (renderFn) {
         var TIME = 0;
+        var waktuLalu = performance.now();
 
         var animate = function () {
             TIME += 0.05;
+            var sekarang = performance.now();
+            var dt = Math.min(0.1, (sekarang - waktuLalu) / 1000);   // detik sejak frame lalu (dibatasi supaya tidak meloncat)
+            waktuLalu = sekarang;
 
             if (!drag) {
                 dX *= (1 - FRICTION);
@@ -243,8 +294,35 @@ export function createScene(CANVAS) {
             GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
             // 2. Setup kamera & matriks utama
-            LIBS.set_I4(VIEWMATRIX);
-            LIBS.translateZ(VIEWMATRIX, -20.0);
+            if (MODE_BEBAS) {
+                // Gerak WASD di bidang datar mengikuti arah hadap kamera
+                var laju = KECEPATAN * dt * (tombol.ShiftLeft || tombol.ShiftRight ? 3 : 1);
+                var maju = [Math.sin(kamYaw), -Math.cos(kamYaw)], kanan = [Math.cos(kamYaw), Math.sin(kamYaw)];
+                var gx = 0, gz = 0, gy = 0;
+                if (tombol.KeyW) { gx += maju[0]; gz += maju[1]; }
+                if (tombol.KeyS) { gx -= maju[0]; gz -= maju[1]; }
+                if (tombol.KeyD) { gx += kanan[0]; gz += kanan[1]; }
+                if (tombol.KeyA) { gx -= kanan[0]; gz -= kanan[1]; }
+                if (tombol.Space || tombol.KeyQ) gy += 1;
+                if (tombol.ControlLeft || tombol.ControlRight || tombol.KeyE) gy -= 1;
+                var panjang = Math.hypot(gx, gz) || 1;              // diagonal tidak lebih cepat
+                kamPos[0] += gx / panjang * laju;
+                kamPos[2] += gz / panjang * laju;
+                kamPos[1] += gy * laju;
+                if (opsiScene.tinggiMin) kamPos[1] = Math.max(kamPos[1], opsiScene.tinggiMin(kamPos[0], kamPos[2]));
+
+                // VIEW = putarX(pitch) x putarY(yaw) x geser(-posisi kamera)
+                var putarX = LIBS.get_I4(); LIBS.rotateX(putarX, kamPitch);
+                var putarY = LIBS.get_I4(); LIBS.rotateY(putarY, kamYaw);
+                var geser = LIBS.get_I4(); LIBS.set_position(geser, -kamPos[0], -kamPos[1], -kamPos[2]);
+                var putar = LIBS.get_I4(); LIBS.multiply(putar, putarX, putarY);
+                LIBS.multiply(VIEWMATRIX, putar, geser);
+                GL.uniform3f(shaderVars.uCameraPos, kamPos[0], kamPos[1], kamPos[2]);
+            } else {
+                LIBS.set_I4(VIEWMATRIX);
+                LIBS.translateZ(VIEWMATRIX, -20.0);
+                GL.uniform3f(shaderVars.uCameraPos, 0.0, 0.0, 20.0);
+            }
 
             GL.uniformMatrix4fv(shaderVars.Pmatrix, false, PROJMATRIX);
             GL.uniformMatrix4fv(shaderVars.Vmatrix, false, VIEWMATRIX);
@@ -255,10 +333,12 @@ export function createScene(CANVAS) {
             GL.uniform1f(shaderVars.uUseVertexColor, 0.0);
             resetMaterial(GL, shaderVars);
 
-            // 3. Rotasi mouse
+            // 3. Rotasi mouse (kamera bebas: dunia tidak diputar, kamera yang bergerak)
             var MOUSE_ROT = LIBS.get_I4();
-            LIBS.rotateY(MOUSE_ROT, THETA);
-            LIBS.rotateX(MOUSE_ROT, PHI);
+            if (!MODE_BEBAS) {
+                LIBS.rotateY(MOUSE_ROT, THETA);
+                LIBS.rotateX(MOUSE_ROT, PHI);
+            }
 
             // 4. Render semua objek
             renderFn(shaderVars, MOUSE_ROT, TIME);
@@ -270,7 +350,10 @@ export function createScene(CANVAS) {
         animate();
     };
 
-    return { GL, CANVAS, shaderVars, run };
+    // posisiKamera() -> [x, y, z] kamera bebas saat ini (berguna untuk mencari koordinat saat menyusun ADEGAN)
+    var posisiKamera = function () { return kamPos.slice(); };
+
+    return { GL, CANVAS, shaderVars, run, posisiKamera };
 }
 
 // Geser objek ke posisi (x, y, z) relatif terhadap matriks parent, dengan skala s (opsional, default 1).

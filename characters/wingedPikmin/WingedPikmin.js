@@ -7,18 +7,32 @@ import { Limbs } from "./bodyParts/Limbs.js";
 import { Antenna } from "./bodyParts/Antenna.js";
 import { Wings } from "./bodyParts/Wings.js";
 
+import { Timeline } from "../../shared/timeline.js";
 import { poseBerdiri } from "./animation/Berdiri.js";
 import { poseTerbang } from "./animation/Terbang.js";
+import { melambai } from "./animation/Melambai.js";
+import { mengangguk } from "./animation/Mengangguk.js";
 
-// Daftar pose yang bisa dipilih lewat setPose(nama)
-const DAFTAR_POSE = {
+// Daftar animasi: dipakai setPose(nama) dan urutan di animation/urutan.js.
+// Animasi baru: buat file di animation/, lalu daftarkan namanya di sini.
+export const DAFTAR_ANIMASI = {
     normal: poseBerdiri,
     terbang: poseTerbang,
+    melambai: melambai,
+    mengangguk: mengangguk,
 };
+
+// Pose dasar (semua sendi 0) sebelum animasi diterapkan
+function poseKosong() {
+    return { kepala: 0, badan: 0, lengan: { angkat: 0, ayun: 0, siku: 0 }, kaki: { ayun: 0 } };
+}
 
 const LEHER_Y = -0.5;
 
 export class WingedPikmin {
+    // Jarak dari titik asal model ke telapak kaki (dipakai supaya kaki pas menginjak tanah)
+    static TINGGI_KAKI = 2.5;
+
     constructor(GL, namaPose = "terbang") {
         var sphereMesh = builder.generateEllipsoid(1.2, 1.0, 1.2, 30, 20, 1.0, 0.41, 0.71);
         var curvedConeMesh = builder.generateCurvedCone(0.25, 1.8, 20, 16, 0.9, 0.2, 0.5);
@@ -36,26 +50,33 @@ export class WingedPikmin {
         this.wing = new Wings(GL, wingMesh);
 
         // Pose diatur oleh file di folder animation/
-        this.pose = {
-            kepala: 0,
-            badan: 0,
-            lengan: { angkat: 0, ayun: 0, siku: 0 },
-            kaki: { ayun: 0 },
-        };
+        this.pose = poseKosong();
+        this.timeline = null;
         this.setPose(namaPose);
     }
 
-    // nama = "normal" atau "terbang"
+    // Pose diam. nama = salah satu isi DAFTAR_ANIMASI ("normal", "terbang", ...). Menghentikan urutan.
     setPose(nama) {
-        if (!DAFTAR_POSE[nama]) {
+        if (!DAFTAR_ANIMASI[nama]) {
             console.warn("Pose tidak dikenal: " + nama);
             return;
         }
-        DAFTAR_POSE[nama](this);
+        this.timeline = null;
+        this.pose = poseKosong();
+        DAFTAR_ANIMASI[nama](this, 1, 0, {});
         this.namaPose = nama;
     }
 
+    // Putar urutan animasi (lihat animation/urutan.js)
+    mainkanUrutan(urutan, opsi = {}) {
+        this.timeline = new Timeline(DAFTAR_ANIMASI, urutan, Object.assign({ poseDasar: poseKosong() }, opsi));
+        this.namaPose = "urutan";
+    }
+
     render(shaderVars, parentMatrix, time) {
+        // Kalau urutan sedang diputar: timeline mengisi this.pose dan menggeser posisi karakter
+        if (this.timeline) parentMatrix = this.timeline.terapkan(this, parentMatrix);
+
         // Antena bergoyang dan sayap mengepak mengikuti waktu
         var wobbleFactor = Math.sin(time) * 0.1;
 

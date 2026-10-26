@@ -1,6 +1,7 @@
 import { createScene } from "../../shared/renderer.js";
 import { Environment } from "../../environment/Environment.js";
 import { WingedPikmin } from "./WingedPikmin.js";
+import { URUTAN, OPSI_URUTAN } from "./animation/urutan.js";
 import { Sun } from "../../environment/sun.js";
 
 function main() {
@@ -12,7 +13,7 @@ function main() {
     var wingedPikmin = new WingedPikmin(scene.GL);
     var sun = new Sun(scene.GL, wingedPikmin.sphereMesh || null); 
 
-    // Tombol pilih pose (Normal / Terbang) di pojok kiri atas
+    // Tombol pilih pose (Normal / Terbang / Putar urutan) di pojok kiri atas
     var tombolPose = document.querySelectorAll("#pilih-pose button");
     var tandaiAktif = function () {
         tombolPose.forEach(function (b) {
@@ -21,7 +22,8 @@ function main() {
     };
     tombolPose.forEach(function (b) {
         b.addEventListener("click", function () {
-            wingedPikmin.setPose(b.dataset.pose);
+            if (b.dataset.pose === "urutan") wingedPikmin.mainkanUrutan(URUTAN, OPSI_URUTAN);
+            else wingedPikmin.setPose(b.dataset.pose);
             tandaiAktif();
         });
     });

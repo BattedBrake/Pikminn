@@ -64,3 +64,12 @@ Pakai server lokal dari folder **root `Pikminn`** (ES module tidak jalan kalau d
 - Edit hanya folder karakter sendiri.
 - bisa bikin builders sendiri biar ga campur2 (di folder yang sama)
 - Nama file di `import` harus sama persis huruf besar-kecilnya dengan nama file (Windows tidak peduli, tapi Mac/Linux/GitHub Pages peduli).
+
+## Mengatur adegan (posisi & urutan gerakan)
+
+Buka `main.js` di root, bagian **PENGATURAN ADEGAN** (`const ADEGAN`). Untuk tiap pikmin atur:
+`posisi` awal, `skala`, `arahAwal`, `ulang`, dan `urutan` langkah (`animasi`, `durasi`, `ke`, `hadap`).
+Karakter otomatis menghadap ke arah jalannya dan kakinya mengikuti tinggi pasir.
+
+Pemutar urutan ada di `shared/timeline.js`. Animasi tiap karakter didaftarkan di `DAFTAR_ANIMASI`
+(`WingedPikmin.js`, `RedPikmin.js`, `RockPikmin.js`); animasi hanya boleh mengisi angka di `pikmin.pose`.

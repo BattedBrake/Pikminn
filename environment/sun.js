@@ -51,7 +51,7 @@ export class Sun {
         const GL = this.gl;
         const STRIDE = 4 * 9; // 💡 Pastikan dikali 9
 
-        GL.uniform1f(shaderVars.uRoughness, 0.0);
+        GL.uniform1f(shaderVars.uRoughness, 90.0);
         GL.uniform1f(shaderVars.uShininess, 100.0);
 
         GL.uniform3f(shaderVars.uColor, 9.0, 2.5, 0.5); 
@@ -64,12 +64,12 @@ export class Sun {
 
         var SUN_MATRIX = LIBS.get_I4();
         LIBS.translateX(SUN_MATRIX, 8.0);  
-        LIBS.translateY(SUN_MATRIX, 18.0);  
+        LIBS.translateY(SUN_MATRIX, 300.0);  
         LIBS.translateZ(SUN_MATRIX, -20.0); 
 
         let pulse = 1.0 + Math.sin(time * 0.1) * 0.05;
         
-        LIBS.scale(SUN_MATRIX, 3.0 * pulse, 3.0 * pulse, 3.0 * pulse); 
+        LIBS.scale(SUN_MATRIX, 50.0 * pulse, 50.0 * pulse, 50.0 * pulse); 
 
         var FINAL_SUN = LIBS.get_I4();
         LIBS.multiply(FINAL_SUN, root, SUN_MATRIX); 

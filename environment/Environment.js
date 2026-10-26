@@ -1,16 +1,47 @@
 import { LIBS } from '../shared/libs.js';
+import { setMaterial, resetMaterial } from '../shared/renderer.js';
 
-// 💡 1. Buat fungsi helper untuk menghitung tinggi tanah (Y) berdasarkan posisi X dan Z
-export function tinggiTanah(x, z) {
-    // Rumus ini HARUS SAMA PERSIS dengan rumus yPos di dalam generateWavyDesert
+// Rumus bentuk bukit: tinggi di titik-titik grid tanah dihitung dari sini
+export function rumusTanah(x, z) {
     return -3.75 + Math.sin(x * 0.4) * Math.cos(z * 0.4) * 0.6;
 }
+
+// Ukuran tanah (lebar = dalam), berpusat di (0, 0): membentang dari -UKURAN_TANAH/2 sampai +UKURAN_TANAH/2.
+// Pohon (environment/pohon.js) otomatis menyebar mengikuti angka ini.
+export const UKURAN_TANAH = 1000;
+
+// Jumlah kotak grid per sisi. Jarak antar titik grid = UKURAN_TANAH / RESOLUSI_TANAH.
+// Makin besar makin halus mengikuti rumusTanah (maksimal 255 karena index 16-bit).
+export const RESOLUSI_TANAH = 50;
+
+// Tinggi PERMUKAAN TANAH YANG TERGAMBAR di titik (x, z).
+// Grid tanah lebih kasar daripada gelombang rumusTanah, jadi tinggi dibaca dari segitiga mesh
+// (bukan dari rumus) supaya pohon, rumput, pikmin, dan kamera benar-benar menapak di permukaan.
+export function tinggiTanah(x, z) {
+    var langkah = UKURAN_TANAH / RESOLUSI_TANAH, setengah = UKURAN_TANAH / 2;
+    var gx = Math.min(Math.max((x + setengah) / langkah, 0), RESOLUSI_TANAH - 1e-6);
+    var gz = Math.min(Math.max((z + setengah) / langkah, 0), RESOLUSI_TANAH - 1e-6);
+    var i = Math.floor(gx), j = Math.floor(gz), u = gx - i, v = gz - j;
+    var x0 = -setengah + i * langkah, z0 = -setengah + j * langkah;
+    var h0 = rumusTanah(x0, z0), h1 = rumusTanah(x0 + langkah, z0);
+    var h2 = rumusTanah(x0, z0 + langkah), h3 = rumusTanah(x0 + langkah, z0 + langkah);
+    // Kotak grid dibagi dua segitiga lewat diagonal (x+1, z) - (x, z+1), sama seperti di generateWavyDesert
+    if (u + v <= 1) return h0 + u * (h1 - h0) + v * (h2 - h0);
+    return h3 + (1 - u) * (h2 - h3) + (1 - v) * (h1 - h3);
+}
+
+// Kekasaran permukaan tanah (ubah angkanya untuk menyetel tampilan)
+//   tekstur       = kekuatan kasar: 0 = mulus .. 1 = sangat kasar (bergelombang kecil + bercak + bintik)
+//   skalaTekstur  = kerapatan butiran: kecil = gumpalan besar, besar = butiran halus dan rapat
+//   kilap         = ketajaman kilap (kecil = kilap lebar & lembut)
+//   kekuatanKilap = 0 (tanah tidak mengkilap sama sekali) .. 1 (mengkilap penuh)
+export const MATERIAL_TANAH = { tekstur: 0.5, skalaTekstur: 0.9, kilap: 5, kekuatanKilap: 0.3 };
 
 export class Environment {
     constructor(gl) {
         this.gl = gl;
     
-        var planeData = this.generateWavyDesert(40, 40, 50); 
+        var planeData = this.generateWavyDesert(UKURAN_TANAH, UKURAN_TANAH, RESOLUSI_TANAH); 
 
         this.envVB = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.envVB);
@@ -37,8 +68,8 @@ export class Environment {
             for (let x = 0; x <= resolution; x++) {
                 let xPos = -halfW + x * dx;
 
-                // Memanggil fungsi tinggiTanah agar rumusnya terpusat dan konsisten
-                let yPos = tinggiTanah(xPos, zPos); 
+                // Tinggi titik grid dari rumusTanah (tinggiTanah membaca kembali permukaan ini)
+                let yPos = rumusTanah(xPos, zPos); 
 
                 // Warna pasir gurun (Kecokelatan / Oranye Keemasan)
                 let r = 0.85, g = 0.65, b = 0.35; 
@@ -70,14 +101,13 @@ export class Environment {
         const GL = this.gl;
         const STRIDE = 4 * 9;
 
-        // Set material tanah (sedikit kasar agar efek cahayanya bagus)
-        GL.uniform1f(shaderVars.uRoughness, 0.8);
-        GL.uniform1f(shaderVars.uShininess, 200000000000000.0);
-        GL.uniform3f(shaderVars.uColor, 0.6, 0.50, 0.4);
+        // Material tanah: kasar & tidak mengkilap (atur di MATERIAL_TANAH di atas)
+        GL.uniform1f(shaderVars.uIsRough, 0.0);
+        setMaterial(GL, shaderVars, MATERIAL_TANAH);
+        GL.uniform3f(shaderVars.uColor, 0.34, 0.65, 0.22);
 
         GL.bindBuffer(GL.ARRAY_BUFFER, this.envVB);
         
-        // 💡 Diperbaiki syntax vertexAttribPointer-nya
         GL.vertexAttribPointer(shaderVars.position, 3, GL.FLOAT, false, STRIDE, 0);
         GL.vertexAttribPointer(shaderVars.normal, 3, GL.FLOAT, false, STRIDE, 4 * 3);
         GL.vertexAttribPointer(shaderVars.color, 3, GL.FLOAT, false, STRIDE, 4 * 6);
@@ -87,5 +117,7 @@ export class Environment {
         // Render tanah sesuai matriks root scene
         GL.uniformMatrix4fv(shaderVars.mMmatrix, false, root);
         GL.drawElements(GL.TRIANGLES, this.indexCount, GL.UNSIGNED_SHORT, 0);
+
+        resetMaterial(GL, shaderVars);   // supaya objek berikutnya tidak ikut kasar
     }
 }

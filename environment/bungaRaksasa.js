@@ -30,7 +30,7 @@ function createKopdesSignTexture() {
     ctx.fill();
 
     // Teks
-    ctx.fillStyle = '#1E5E20';
+    ctx.fillStyle = '#ecf5ed';
     ctx.font = 'bold 36px sans-serif';
     ctx.fillText('KOPERASI DESA', 120, 52);
 
