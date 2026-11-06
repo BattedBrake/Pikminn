@@ -14,7 +14,7 @@ import { Rumput } from "./environment/rumput.js";
 import { melambai } from "./characters/wingedPikmin/animation/Melambai.js";
 
 // =====================================================================================
-// PENGATURAN ADEGAN: posisi awal, ukuran, dan urutan gerakan tiap pikmin
+// PENGATURAN ADEGAN: posisi awal, ukuran, dan urutan gerakan tiap pikmin, chest, dan kunci
 // =====================================================================================
 //   posisi   : posisi awal [x, y, z]. y = tinggi DI ATAS TANAH (0 = kaki menginjak pasir)
 //   skala    : ukuran karakter
@@ -37,6 +37,10 @@ import { melambai } from "./characters/wingedPikmin/animation/Melambai.js";
 //   red    : normal, jalan, tutupMata, melambai            (characters/redPikmin/RedPikmin.js)
 //   winged : normal, terbang, melambai, mengangguk         (characters/wingedPikmin/WingedPikmin.js)
 //   rock   : normal, jalan, melambai                       (characters/rockPikmin/RockPikmin.js)
+//   chest  : tertutup, buka, terbuka, tutup                (environment/chest.js)
+//   kunci  : diam, putar, melayang                         (environment/skeletonKey.js)
+//   Chest & kunci tidak berbelok otomatis saat dipindah (pakai hadap kalau ingin memutarnya).
+//   Langkah tanpa animasi kembali ke pose awal: setelah "buka", pakai "terbuka" supaya tutup tetap terbuka.
 //
 // Kalau ulang = true, posisi kembali ke awal saat urutan diulang: buat langkah terakhir kembali ke posisi awal.
 // Sumbu: x = kiri(-)/kanan(+), z = jauh(-)/dekat kamera(+).
@@ -50,6 +54,15 @@ const ADEGAN = {
             { animasi: ["normal" , "melambai"],    durasi: 4 , hadap : -90 },
             { animasi: "jalan",     durasi: 3, ke: [-11, 0, 14] }, 
             { animasi: "melambai",    durasi: 3 },    
+            { animasi: "normal",    durasi: 23 },
+            { animasi: "normal",    durasi: 3, miring : -30,},
+            { animasi: "normal",    durasi: 2, miring : 0,},
+            { animasi: "normal",    durasi: 1},
+            { animasi: "normal",    durasi: 1.6, hadap :0},
+            { animasi: "normal",    durasi: 0.1, ke: [-11, 1, 14]},
+            { animasi: "normal",    durasi: 0.1, ke: [-11, 0, 14]},
+            { animasi: "normal",    durasi: 2},
+            { animasi: "jalan",    durasi: 40, ke: [-11, 0, 130] },
         ],
     },
     winged: {
@@ -60,9 +73,20 @@ const ADEGAN = {
             { animasi: "terbang",                durasi: 5, ke: [-28, 4, -15] },   // terbang ke belakang-kanan
             { animasi: ["terbang", "melambai"],  durasi: 2, hadap: 0 },
             { animasi: "terbang",                durasi: 3, ke: [-15, 4, 12] }, 
-            { animasi: ["normal", "melambai"],  durasi: 10, hadap: 0 , miring : 60},
-    
-    
+            { animasi: ["normal", "melambai"],  durasi: 15, hadap: 0 , miring : 60},
+            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : 60, ke: [-14,-1,15]},
+            { animasi: ["normal"],  durasi: 2, hadap: 0 , miring : 60},
+            { animasi: ["normal"],  durasi: 1, hadap: 0 , miring : 60, ke: [-14,0,15]},
+            { animasi: ["normal"],  durasi: 2, hadap: 0 , miring : 60, ke: [-14,-1,15]},
+            { animasi: ["normal"],  durasi: 2, hadap: 0 , miring : 60},
+            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : 60, ke: [-14,3,15]},
+            { animasi: ["normal", "melambai"],  durasi: 5, hadap: 0 , miring : 30, ke: [-14,1,12]},
+            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : -30, ke: [-14,1,12]},
+            { animasi: "normal",    durasi: 2, miring : 0,},
+            { animasi: ["normal", "melambai"],  durasi: 1, ke: [-14,3,12]},
+            { animasi: "normal",                 durasi: 2.2 },
+            { animasi: "terbang",                durasi: 40, ke: [-14, 3, 130] },
+
         ],
     },
     rock: {
@@ -73,7 +97,39 @@ const ADEGAN = {
             { animasi: "jalan",    durasi: 3, ke: [-15, 0, 15] },
             { animasi: "normal",   durasi: 15, miring : 90 },
             { animasi: "normal",   durasi: 2, miring : 0 , hadap : 90 },
-            { animasi: "jalan",   durasi: 3, miring : 0, hadap : 90, ke: [-20,0,15]},
+            { animasi: "jalan",   durasi: 3, miring : 0, hadap : 90, ke: [-18,0,15]},
+            { animasi: "normal",   durasi: 20 },
+            { animasi: "normal",   durasi: 3, miring : -30,},
+            { animasi: "normal",    durasi: 2, miring : 0,},
+            { animasi: "normal",    durasi: 1},
+            { animasi: "normal",    durasi: 1.6, hadap :0},
+            { animasi: "normal",    durasi: 0.1, ke: [-18,1,15]},
+            { animasi: "normal",    durasi: 0.1, ke: [-18,0,15]},
+            { animasi: "normal",    durasi: 2},
+            { animasi: "jalan",    durasi: 40, ke: [-18, 0, 130] },
+
+        ],
+    },
+    chest: {
+        posisi: [-14, -1.5, 15], skala: 1.5, ulang: false,
+        urutan: [
+            { animasi: "tertutup", durasi : 43 },
+            { animasi: "tertutup", ke: [-14, -0.5, 15], durasi : 1 },
+            { animasi: "tertutup", ke: [-14, -1.5, 15], durasi : 2 },
+            { animasi: "tertutup", ke: [-14, -1.5, 15], durasi : 2 },
+            { animasi: "tertutup", ke: [-14, 2, 15], durasi : 3 },
+            { animasi: "tertutup", ke: [-14, 0, 15], durasi : 0.5 },
+        ],
+    },
+    kunci: {
+        posisi: [-14, -2.5, 15], skala: 1, ulang: false,
+        urutan: [
+            { animasi: "diam",     durasi: 55 },
+            { animasi: "diam", durasi: 1, ke: [-14, 4, 15] },
+            { animasi: "diam", durasi: 3},
+            { animasi: "diam", durasi: 1, ke: [-14, 2.4, 17] },
+            { animasi: "diam", durasi: 1, miring : -90},
+            { animasi: "diam", durasi: 40, miring : -90, ke: [-14, 2.4, 140] },
         ],
     },
 };
@@ -118,6 +174,10 @@ function main() {
     var chest = new Chest(scene.GL);
     var kunci = new SkeletonKey(scene.GL);
     var kopdes = new Kopdes(scene.GL);
+
+    pasangAdegan(chest, Chest, ADEGAN.chest);
+    pasangAdegan(kunci, SkeletonKey, ADEGAN.kunci);
+
     // Pohon tersebar acak (tetap sama tiap dibuka). Atur jumlah, seed, area, dan area kosong di sini.
     var hutan = new Hutan(scene.GL, {
         jumlah: 300,
@@ -151,9 +211,11 @@ function main() {
         rumput.render(shaderVars, root);
 
         // Item environment: place(root, x, y, z, skala), y = tinggiTanah(x, z) supaya menempel di pasir
-        kopdes.render(shaderVars, place(root, 50, tinggiTanah(0, -14), -300, 2.8));
-        chest.render(shaderVars, place(root, -7, tinggiTanah(-7, 1), 1, 2.5));
-        kunci.render(shaderVars, place(root, 7, tinggiTanah(7, 1), 1, 2.5));
+        kopdes.render(shaderVars, place(root, -14, tinggiTanah(0, -14), 160, 2.8));
+
+        // Chest & kunci: posisi & gerakan diatur oleh ADEGAN di atas
+        chest.render(shaderVars, root);
+        kunci.render(shaderVars, root);
 
         // Pikmin: posisi & gerakan diatur oleh ADEGAN di atas
         wingedPikmin.render(shaderVars, root, time);

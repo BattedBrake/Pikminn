@@ -67,7 +67,8 @@ export class Timeline {
     // opsi.poseDasar = pose awal sebelum animasi diterapkan (default: pose karakter saat timeline mulai),
     // opsi.arahAwal = arah hadap awal dalam derajat (default 0 = menghadap kamera),
     // opsi.skala = ukuran karakter (default 1),
-    // opsi.tanah = fungsi (x, z) -> tinggi yang ditambahkan ke y (misalnya tinggi pasir), default 0
+    // opsi.tanah = fungsi (x, z) -> tinggi yang ditambahkan ke y (misalnya tinggi pasir), default 0,
+    // opsi.hadapOtomatis = false supaya tidak berbelok mengikuti arah gerak (default true)
     constructor(daftarAnimasi, urutan, opsi = {}) {
         this.daftar = daftarAnimasi;
         this.urutan = urutan;
@@ -99,7 +100,7 @@ export class Timeline {
             this.posAkhir.push(b);
             var dx = b[0] - a[0], dz = b[2] - a[2];
             if (l.hadap !== undefined) arah = l.hadap * Math.PI / 180;
-            else if (Math.abs(dx) + Math.abs(dz) > 1e-6) arah = Math.atan2(dx, dz);
+            else if (opsi.hadapOtomatis !== false && Math.abs(dx) + Math.abs(dz) > 1e-6) arah = Math.atan2(dx, dz);
             this.arah.push(arah);
             this.miring.push((l.miring || 0) * Math.PI / 180);
             this.guling.push((l.guling || 0) * Math.PI / 180);

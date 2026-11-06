@@ -7,6 +7,7 @@
 //   m.addPart(B.box(1.4, 0.5, 1.4), KAYU, T(0, 0.25, 0.7), "tutup");
 //   m.render(shaderVars, parentMatrix);
 import { LIBS } from "../shared/libs.js";
+import { Timeline } from "../shared/timeline.js";
 
 // ---------- Pembuat matriks (urutan sama seperti Three.js: posisi x rotasi x skala) ----------
 export function T(x, y, z) { var m = LIBS.get_I4(); LIBS.set_position(m, x, y, z); return m; }
@@ -86,5 +87,37 @@ export class EnvModel {
             GL.uniformMatrix4fv(shaderVars.mMmatrix, false, mul(cacheGrup[kunci], p.matrix));
             GL.drawElements(GL.TRIANGLES, p.mesh.faces.length, GL.UNSIGNED_SHORT, 0);
         });
+    }
+}
+
+// Item yang bisa digerakkan lewat urutan (ADEGAN di main.js), memakai timeline yang sama dengan pikmin.
+//   poseAwal      = angka-angka gerakan item saat diam, misalnya { tutup: 0 }
+//   daftarAnimasi = { nama: fungsi(item, progres, waktu, langkah) } yang hanya mengisi item.pose
+// Kelas turunan mengisi terapkanPose(parentMatrix): terapkan this.pose, lalu kembalikan matriks untuk model.
+export class ItemBergerak {
+    // Titik asal item ada di alasnya, jadi tidak perlu tambahan tinggi di atas tanah
+    static TINGGI_KAKI = 0;
+
+    constructor(GL, poseAwal, daftarAnimasi) {
+        this.model = new EnvModel(GL);
+        this.poseAwal = poseAwal;
+        this.pose = JSON.parse(JSON.stringify(poseAwal));
+        this.daftarAnimasi = daftarAnimasi;
+        this.timeline = null;
+    }
+
+    // Item tidak berbelok otomatis saat dipindah. Pakai hadap di langkah urutan kalau ingin memutarnya.
+    mainkanUrutan(urutan, opsi = {}) {
+        this.timeline = new Timeline(this.daftarAnimasi, urutan,
+            Object.assign({ poseDasar: this.poseAwal, hadapOtomatis: false }, opsi));
+    }
+
+    terapkanPose(parentMatrix) {
+        return parentMatrix;
+    }
+
+    render(shaderVars, parentMatrix) {
+        if (this.timeline) parentMatrix = this.timeline.terapkan(this, parentMatrix);
+        this.model.render(shaderVars, this.terapkanPose(parentMatrix));
     }
 }
