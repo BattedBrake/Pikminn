@@ -145,7 +145,7 @@ const ADEGAN = {
             // penutup: berbalik, lalu melompat-lompat sambil melambai
             { animasi: "normal",   durasi: 1, hadap: 180 },
             // ARBITRARY AXIS: sambil melompat & melambai, Red mengorbit sumbu miring (lihat ORBIT_RED di atas)
-            { animasi: ["normal", "melambai"], durasi: 12, hadap: 180, lompat: { tinggi: 1.2, kali: 16 }, orbit: ORBIT_RED },
+            { animasi: ["normal", "melambai"], durasi: 14, hadap: 180, lompat: { tinggi: 1.2, kali: 16 }, orbit: ORBIT_RED },
             { animasi: ["normal", "melambai"], durasi: 3, hadap: 180 },
         ],
     },
@@ -171,18 +171,9 @@ const ADEGAN = {
             { animasi: ["normal", "melambai"],  durasi: 1, ke: [-14,3,JARAK_WINGED_Z]},
             { animasi: "normal",                 durasi: 2.2 },
             { animasi: "terbang",                durasi: 40, ke: [-9, 3.5, 135.56] },
-            // penutup: menunggu Red & Rock sampai (1.6 detik lebih cepat), naik ke atas mereka, lalu terbang cepat
-            // MENGELILINGI titik di tengah-tengah Red [-12.2, 137.06] & Rock [-15.8, 137.06] (rotasi sumbu bebas lewat orbit):
-            //   pusat [-14, 137.06], jari-jari 4, mulai setinggi 10 di atas tanah, 4 putaran dalam 12 detik (3 detik per putaran).
-            //   miring: 25 -> SUMBU PUTAR DIMIRINGKAN 25 derajat dari tegak, jadi lingkaran terbangnya miring:
-            //            naik sampai 10 + 4 x sin 25 (sekitar 11.7) di satu sisi dan turun ke sekitar 8.3 di sisi seberang
-            //            (tetap di atas kepala Red & Rock yang sedang melompat).
-            //   guling: -20 -> badan condong ke dalam lingkaran seperti pesawat yang membanking saat berbelok.
-            //   Winged otomatis menghadap arah terbangnya.
             { animasi: "terbang",                durasi: 1.6 },
             { animasi: "terbang",                durasi: 1, ke: [-14, 10, 133.06] },
-            { animasi: ["terbang", "melambai", "mataBergantian"], durasi: 12, guling: -20,
-              orbit: { pusat: [-14, 137.06], putaran: 1440, miring: 25 } },
+            { animasi: ["terbang", "melambai", "mataBergantian"], durasi: 14, guling: -20,orbit: { pusat: [-14, 137.06], putaran: 1440, miring: 25 } },
             { animasi: ["terbang", "melambai"],  durasi: 3, hadap: 180 },
 
         ],
@@ -215,7 +206,7 @@ const ADEGAN = {
             { animasi: "jalan",    durasi: 40, ke: [-15.8, 0, 137.06] },
             // penutup: berbalik, lalu melompat-lompat sambil melambai (sedikit lebih lambat dari Red supaya tidak seragam)
             { animasi: "normal",   durasi: 1, hadap: 180 },
-            { animasi: ["normal", "melambai"], durasi: 12, hadap: 180, lompat: { tinggi: 1, kali: 14 } },
+            { animasi: ["normal", "melambai","putar"], durasi: 14,periode: 8, hadap: 180, lompat: { tinggi: 1, kali: 14 } },
             { animasi: ["normal", "melambai"], durasi: 3, hadap: 180 },
 
         ],
