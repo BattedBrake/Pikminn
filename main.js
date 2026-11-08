@@ -98,17 +98,37 @@ const DEPAN_TANGGA = KOPDES.z - 4.8 * KOPDES.skala;   // ujung tangga depan (z =
 // supaya badannya (radius sekitar 1.2) tidak tertabrak tutup. Makin kecil = makin jauh dari peti.
 const JARAK_WINGED_Z = 10;
 
+// =====================================================================================
+// ORBIT RED SAAT MELOMPAT DI DEPAN KOPDES (ROTASI SUMBU BEBAS / ARBITRARY AXIS)
+// =====================================================================================
+// Red melompat sambil memutari sebuah garis yang DIMIRINGKAN (sumbunya tidak sejajar X/Y/Z), memakai
+// T(pusat) x R(sumbu, sudut) x T(-pusat) (LIBS.rotasiSumbu, rumus Rodrigues) lewat opsi orbit di shared/timeline.js.
+// Supaya Red tidak tenggelam ke tanah karena sumbunya miring, sumbu dicondongkan ke arah jari-jari awal dan
+// pusat dinaikkan setinggi jari-jari x tan(miring). Hasilnya titik TERENDAH lintasan = titik awal Red (di tanah),
+// lalu naik pelan sampai sekitar 2 x jari-jari x tan(miring) di sisi seberang. Red menghadap ke dalam lingkaran
+// dan ikut condong seperti membelok. Lintasan sengaja digeser ke sisi kanan-depan (menjauhi Rock di x = -15.8 dan
+// tangga rumah di z = 138.56). Kalau titik akhir Red berubah, awal & pusat di bawah ini ikut disesuaikan.
+const ORBIT_RED = (function () {
+    var awal = [-12.2, 137.06];      // posisi Red di depan tangga (akhir langkah jalan)
+    var pusat = [-10.5, 134.6];      // titik yang dilewati sumbu, [x, z]
+    var miring = 12 * Math.PI / 180; // condong sumbu dari tegak (12 derajat)
+    var rx = awal[0] - pusat[0], rz = awal[1] - pusat[1];
+    var r = Math.hypot(rx, rz);      // jari-jari lintasan (sekitar 3)
+    return {
+        // y pusat = jari-jari x tan(miring), dikoreksi selisih tinggi tanah antara titik awal dan pusat
+        pusat: [pusat[0], r * Math.tan(miring) + tinggiTanah(awal[0], awal[1]) - tinggiTanah(pusat[0], pusat[1]), pusat[1]],
+        sumbu: [Math.sin(miring) * rx / r, Math.cos(miring), Math.sin(miring) * rz / r],
+        putaran: 720,                // 2 putaran penuh selama 12 detik (kelipatan 360 supaya kembali ke titik awal)
+    };
+})();
+
 const ADEGAN = {
     red: {
         posisi: [5, 0, 2], skala: 0.75, arahAwal: 0, ulang: false,
         urutan: [
             { animasi: "jalan",     durasi: 10, ke: [42, 0, 3] },
-            { animasi: "tutupMata", durasi: 8, hadap: 90 },
-            // ARBITRARY AXIS: begitu selesai tutup mata, Red berjalan satu keliling penuh memutari pohon tempatnya menutup mata.
-            // Pohon (Hutan seed 10) ada di x = 46.49, z = 3.96, jadi sumbunya melewati pusat = [46.49, 3.96] (dihitung LIBS.rotasiSumbu).
-            // ke: ujung langkah sedikit lebih jauh dari batang (jari-jari 4.6 -> 5.5) sehingga lintasannya melebar seperti spiral
-            // dan Red tidak menabrak batang. Kalau seed/jumlah pohon diubah, pusat ini harus ikut diganti.
-            { animasi: "jalan",     durasi: 5, kecepatan: 10, ke: [41.11, 0, 2.81], orbit: { pusat: [46.49, 3.96], putaran: 360 } },
+            // durasi 13 = 8 detik tutup mata + 5 detik (dulu dipakai Red memutari pohon) supaya jadwal adegan lain tidak bergeser
+            { animasi: "tutupMata", durasi: 13, hadap: 90 },
             { animasi: ["normal" , "melambai"],    durasi: 4 , hadap : -90 },
             { animasi: "jalan",     durasi: 3, ke: [-11, 0, 14] }, 
             { animasi: "melambai",    durasi: 3 },    
@@ -124,7 +144,8 @@ const ADEGAN = {
             { animasi: "jalan",    durasi: 40, ke: [-12.2, 0, 137.06] },
             // penutup: berbalik, lalu melompat-lompat sambil melambai
             { animasi: "normal",   durasi: 1, hadap: 180 },
-            { animasi: ["normal", "melambai"], durasi: 12, hadap: 180, lompat: { tinggi: 1.2, kali: 16 } },
+            // ARBITRARY AXIS: sambil melompat & melambai, Red mengorbit sumbu miring (lihat ORBIT_RED di atas)
+            { animasi: ["normal", "melambai"], durasi: 12, hadap: 180, lompat: { tinggi: 1.2, kali: 16 }, orbit: ORBIT_RED },
             { animasi: ["normal", "melambai"], durasi: 3, hadap: 180 },
         ],
     },
