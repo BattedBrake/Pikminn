@@ -51,12 +51,13 @@ export class Limbs {
     }
 
     // pose.lengan = { buka, ayun }, pose.kaki = { ayun }  (radian)
-    render(shaderVars, bodyF, pose) {
+    // lebar = tambahan lebar badan (animasi tangis): bahu ikut bergeser keluar supaya tetap menempel di badan
+    render(shaderVars, bodyF, pose, lebar = 0) {
         const GL = this.gl;
 
         [-1, 1].forEach((s) => {
             // LENGAN = BADAN x T(bahu) x RZ(buka) x RX(ayun). Semua berputar di bahu.
-            var armF = mul(bodyF, T(s * 0.64, 0.3, 0), RZ(s * pose.lengan.buka), RX(s * pose.lengan.ayun));
+            var armF = mul(bodyF, T(s * 0.64 * (1 + lebar), 0.3 * (1 - 0.4 * lebar), 0), RZ(s * pose.lengan.buka), RX(s * pose.lengan.ayun));
             drawMesh(GL, shaderVars, this.arm[s].mesh, armF, MATERIAL.kaki);
 
             // TANGAN = LENGAN x basis(ujung lengan): bola kecil + 3 jari menyebar seperti kipas

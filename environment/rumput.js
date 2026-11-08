@@ -1,7 +1,9 @@
 // rumput.js
-// Rumput dari helai-helai kecil. Konsepnya sama dengan tangkai pikmin: setiap helai adalah TABUNG yang
-// mengikuti KURVA BEZIER kubik (4 titik kontrol) dan meruncing ke ujung, dengan gradasi warna
+// Rumput dari helai-helai kecil. Konsepnya sama dengan tangkai pikmin: setiap helai mengikuti
+// KURVA BEZIER kubik (4 titik kontrol) dan meruncing ke ujung, dengan gradasi warna
 // hijau tua di pangkal -> hijau muda di ujung (warna per-vertex).
+// Penampang helai PIPIH (lebar di sumbu z lokal, tipis di sumbu lengkung) seperti daun rumput asli,
+// bukan tabung bulat seperti jarum.
 //
 // Helai dikelompokkan per RUMPUN (beberapa helai berdekatan, condong ke arah acak) supaya terlihat alami.
 // Semua helai digabung ke beberapa mesh besar, jadi ribuan helai tetap ringan (hanya beberapa kali gambar per frame).
@@ -22,8 +24,9 @@ function acak(seed) {
     };
 }
 
-const SEGMEN = 5;   // ruas sepanjang helai
-const SISI = 5;     // sisi penampang tabung
+const SEGMEN = 4;   // ruas sepanjang helai
+const SISI = 5;     // sisi penampang
+const PIPIH = 0.22; // tebal helai dibanding lebarnya (1 = bulat seperti tabung, kecil = pipih seperti daun)
 
 // Tambahkan satu helai ke array vertices & faces.
 //   (bx, by, bz) = pangkal, tinggi = panjang helai, condong = 0 (tegak) .. 1 (melengkung jauh),
@@ -53,8 +56,11 @@ function tambahHelai(vertices, faces, bx, by, bz, tinggi, condong, putar, jari, 
         for (var j = 0; j <= SISI; j++) {
             var a = j / SISI * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
             // normal lokal & posisi lokal di keliling tabung
-            var nx = ca * s1x, ny = ca * s1y, nz = sa;
-            var px = cx + r * nx, py = cy + r * ny, pz = r * nz;
+            // penampang elips: tipis searah lengkung (PIPIH), lebar searah z. Normal elips = (ca / PIPIH, sa)
+            var ne = Math.hypot(ca / PIPIH, sa) || 1;
+            var ka = (ca / PIPIH) / ne, kz = sa / ne;
+            var nx = ka * s1x, ny = ka * s1y, nz = kz;
+            var px = cx + r * PIPIH * ca * s1x, py = cy + r * PIPIH * ca * s1y, pz = r * sa;
             // putar ke arah condong (sumbu y), lalu geser ke pangkal
             vertices.push(
                 bx + px * cp + pz * sp, by + py, bz - px * sp + pz * cp,
@@ -80,9 +86,9 @@ export class Rumput {
     //                     tanah ukuran penuh terlalu luas untuk ditutup rumput rapat)
     //   kosong          : daftar kotak tanpa rumput, [{ xMin, xMax, zMin, zMax }, ...] (default tidak ada)
     //   tinggiMin/tinggiMax : rentang panjang helai (default 0.5 .. 1.3)
-    //   lebarRumpun     : seberapa menyebar helai dalam satu rumpun (default 0.35)
+    //   lebarRumpun     : seberapa menyebar helai dalam satu rumpun (default 0.6)
     //   condong         : seberapa melengkung helai, 0 = tegak .. 1 = melengkung jauh (default 0.5)
-    //   jari            : radius pangkal helai (default 0.04)
+    //   jari            : setengah lebar pangkal helai (default 0.09)
     //   warnaBawah/warnaAtas : warna pangkal & ujung helai (default hijau tua -> hijau muda)
     //   material        : kilap rumput, format setMaterial (default kilap lembut & lemah)
     constructor(GL, opsi = {}) {
@@ -92,11 +98,11 @@ export class Rumput {
         var area = opsi.area || { xMin: -40, xMax: 40, zMin: -40, zMax: 40 };
         var kosong = opsi.kosong || [];
         var tinggiMin = opsi.tinggiMin || 0.5, tinggiMax = opsi.tinggiMax || 1.3;
-        var lebar = opsi.lebarRumpun !== undefined ? opsi.lebarRumpun : 0.35;
+        var lebar = opsi.lebarRumpun !== undefined ? opsi.lebarRumpun : 0.6;
         var condong = opsi.condong !== undefined ? opsi.condong : 0.5;
-        var jari = opsi.jari || 0.04;
-        var warnaBawah = opsi.warnaBawah || [0.13, 0.35, 0.08];
-        var warnaAtas = opsi.warnaAtas || [0.55, 0.85, 0.25];
+        var jari = opsi.jari || 0.09;   // setengah lebar helai di pangkal
+        var warnaBawah = opsi.warnaBawah || [0.10, 0.30, 0.06];
+        var warnaAtas = opsi.warnaAtas || [0.38, 0.66, 0.16];
         this.material = opsi.material || { kilap: 10, kekuatanKilap: 0.1 };
         var rnd = acak(opsi.seed !== undefined ? opsi.seed : 3);
 

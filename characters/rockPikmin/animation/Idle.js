@@ -15,4 +15,6 @@ export function poseIdle(pikmin) {
     pikmin.pose.lengan.buka = 0.95;
     pikmin.pose.lengan.ayun = 0.0;
     pikmin.pose.kaki.ayun = 0.0;
+    pikmin.pose.badan.lebar = 0.0;   // tambahan lebar badan (animasi tangis)
+    pikmin.pose.mata.pupil = 1.0;    // ukuran pupil (animasi kaget)
 }

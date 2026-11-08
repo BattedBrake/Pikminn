@@ -27,6 +27,7 @@ import { jalan } from "./animation/Jalan.js";
 import { tutupMata } from "./animation/TutupMata.js";
 import { melambai } from "./animation/Melambai.js";
 import { goyangTangkai } from "./animation/GoyangTangkai.js";
+import { kaget } from "./animation/Kaget.js";
 
 // Daftar animasi: dipakai setPose(nama) dan urutan.
 // Animasi baru: buat file di animation/, lalu daftarkan namanya di sini.
@@ -35,7 +36,11 @@ export const DAFTAR_ANIMASI = {
     jalan: jalan,
     tutupMata: tutupMata,
     melambai: melambai,
+    kaget: kaget,
 };
+
+// Pernapasan: kecepatan (rad/detik, 2.2 = satu napas sekitar 2.9 detik) dan besar kembang-kempis badan
+const NAPAS_KECEPATAN = 2.2, NAPAS_LEBAR = 0.035, NAPAS_TINGGI = 0.02;
 
 // Pose dasar. Semua sudut dalam radian.
 //   badan.miring = goyang kiri-kanan, badan.toleh = menoleh, badan.naik = naik-turun
@@ -44,7 +49,8 @@ export const DAFTAR_ANIMASI = {
 //   kaki.kiri/kanan:   pinggul = ayun di pinggul, lutut = tekukan lutut (telapak otomatis tetap datar)
 function poseKosong() {
     var pose = {
-        badan: { miring: 0, toleh: 0, naik: 0 },
+        badan: { miring: 0, toleh: 0, naik: 0, napas: 1 },
+        mata: { pupil: 1 },
         lengan: { kiri: { bahuZ: 0, bahuX: 0, siku: 0 }, kanan: { bahuZ: 0, bahuX: 0, siku: 0 } },
         kaki: { kiri: { pinggul: 0, lutut: 0 }, kanan: { pinggul: 0, lutut: 0 } },
     };
@@ -60,6 +66,7 @@ export class RedPikmin {
         var headAndBody = new HeadAndBody(GL);
         this.badan = headAndBody.badan;
         this.kepala = headAndBody.kepala;
+        this.pupil = headAndBody.pupil;
 
         this.antenna = new Antenna(GL, this.kepala);
 
@@ -97,6 +104,19 @@ export class RedPikmin {
         LIBS.rotateZ(m, p.badan.miring);
         LIBS.rotateY(m, p.badan.toleh);
         LIBS.set_position(m, 0, p.badan.naik, 0);
+
+        // Bernapas: badan (hanya bentuk badan, bukan anak-anaknya) mengembang-mengempis lewat POSITION_MATRIX.
+        // Melebar ke samping/depan sedikit lebih banyak daripada tinggi, seperti dada yang menarik napas.
+        var napas = Math.sin(performance.now() / 1000 * NAPAS_KECEPATAN) * p.badan.napas;
+        var bp = this.badan.POSITION_MATRIX;
+        LIBS.set_I4(bp);
+        LIBS.scale(bp, 1 + NAPAS_LEBAR * napas, 1 + NAPAS_TINGGI * napas, 1 + NAPAS_LEBAR * napas);
+
+        // Pupil: diskalakan di bidang mata (x, y); ketebalan (z) tetap supaya tidak menembus bola mata
+        this.pupil.forEach(function (pu) {
+            LIBS.set_I4(pu.POSITION_MATRIX);
+            LIBS.scale(pu.POSITION_MATRIX, p.mata.pupil, p.mata.pupil, 1);
+        });
 
         this.lengan.forEach(function (l) {
             var q = p.lengan[l.sx < 0 ? "kiri" : "kanan"];

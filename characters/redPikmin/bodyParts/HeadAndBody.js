@@ -20,6 +20,7 @@ export class HeadAndBody {
         this.kepala.childs.push(this.hidung);
 
         // Mata & pupil : ellipsoid (sx = -1 untuk kiri, 1 untuk kanan)
+        this.pupil = [];   // referensi pupil kiri & kanan, dipakai animasi kaget (diskalakan lewat POSITION_MATRIX)
         for (var sx of [-1, 1]) {
             var mata = new MyObject(GL, S.ellipsoid(0.36, 0.27, 0.22, PUTIH));
             LIBS.rotateX(mata.MOVE_MATRIX, -Math.PI / 60);        
@@ -28,6 +29,7 @@ export class HeadAndBody {
             var pupil = new MyObject(GL, S.ellipsoid(0.14, 0.15, 0.07, HITAM));
             LIBS.set_position(pupil.MOVE_MATRIX, -sx * 0.02, 0, 0.17);
             mata.childs.push(pupil);
+            this.pupil.push(pupil);
             this.kepala.childs.push(mata);
         }
     }

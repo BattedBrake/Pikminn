@@ -56,7 +56,8 @@ export class Body {
         this.top = top - 0.04;                                                       // sedikit tenggelam ke batu
     }
 
-    render(shaderVars, bodyF) {
+    // pupil = skala pupil (1 = normal, animasi kaget)
+    render(shaderVars, bodyF, pupil = 1) {
         const GL = this.gl;
 
         // ---- BADAN (batu bersegi) ----
@@ -67,7 +68,7 @@ export class Body {
             var eyeF = mul(bodyF, this.eyeFrame[s]);                                  // MATA = BADAN x frame permukaan
             drawMesh(GL, shaderVars, this.eyeWhite, mul(eyeF, S(0.125, 0.14, 0.055)), MATERIAL.mata);
             var pupilF = mul(eyeF, T(0, 0, 0.05));                                    // PUPIL = MATA x T
-            drawMesh(GL, shaderVars, this.eyePupil, mul(pupilF, S(0.085, 0.1, 0.035)), MATERIAL.pupil);
+            drawMesh(GL, shaderVars, this.eyePupil, mul(pupilF, S(0.085 * pupil, 0.1 * pupil, 0.035)), MATERIAL.pupil);
         });
     }
 }

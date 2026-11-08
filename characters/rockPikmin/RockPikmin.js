@@ -18,7 +18,7 @@
 import { Body } from "./bodyParts/Body.js";
 import { Antenna } from "./bodyParts/Antenna.js";
 import { Limbs } from "./bodyParts/Limbs.js";
-import { T, mul } from "./matrix.js";
+import { T, S, mul } from "./matrix.js";
 import { resetMaterial } from "../../shared/renderer.js";
 import { Timeline } from "../../shared/timeline.js";
 import { L_LEG, FOOT_H, HIP_Y, SPLAY } from "./config.js";
@@ -26,6 +26,8 @@ import { L_LEG, FOOT_H, HIP_Y, SPLAY } from "./config.js";
 import { goyangTangkai, poseIdle } from "./animation/Idle.js";
 import { jalan } from "./animation/Jalan.js";
 import { melambai } from "./animation/Melambai.js";
+import { kaget } from "./animation/Kaget.js";
+import { tangis } from "./animation/Tangis.js";
 
 // Daftar animasi: dipakai setPose(nama) dan urutan.
 // Animasi baru: buat file di animation/, lalu daftarkan namanya di sini.
@@ -33,12 +35,14 @@ export const DAFTAR_ANIMASI = {
     normal: poseIdle,
     jalan: jalan,
     melambai: melambai,
+    kaget: kaget,
+    tangis: tangis,
 };
 
 // Pose dasar (radian): lengan.buka = membuka ke samping, lengan.ayun = ayun depan-belakang,
 // kaki.ayun = ayun di pinggul (telapak otomatis tetap datar)
 function poseKosong() {
-    var pose = { lengan: { buka: 0, ayun: 0 }, kaki: { ayun: 0 } };
+    var pose = { lengan: { buka: 0, ayun: 0 }, kaki: { ayun: 0 }, badan: { lebar: 0 }, mata: { pupil: 1 } };
     poseIdle({ pose: pose });
     return pose;
 }
@@ -95,9 +99,13 @@ export class RockPikmin {
 
         GL.uniform1f(shaderVars.uIsRough, 0.0);
         GL.uniform1f(shaderVars.uUseVertexColor, 1.0);   // Rock Pikmin memakai warna per-vertex (segi batu, daun)
-        this.body.render(shaderVars, bodyF);
-        this.antenna.render(shaderVars, bodyF, goyang.sway, goyang.swayZ);
-        this.limbs.render(shaderVars, bodyF, this.pose);
+        // Badan melebar (tangis): skala hanya dikenakan saat menggambar badan, mata, dan pangkal tangkai
+        // (mata & tangkai menempel di permukaan batu, jadi ikut). Bentuk mesh tidak diubah.
+        var lebar = this.pose.badan.lebar;
+        var bodyS = mul(bodyF, S(1 + lebar, 1 - 0.4 * lebar, 1));
+        this.body.render(shaderVars, bodyS, this.pose.mata.pupil);
+        this.antenna.render(shaderVars, bodyS, goyang.sway, goyang.swayZ);
+        this.limbs.render(shaderVars, bodyF, this.pose, lebar);   // bahu digeser keluar mengikuti lebar badan
         GL.uniform1f(shaderVars.uUseVertexColor, 0.0);
         resetMaterial(GL, shaderVars);   // supaya objek berikutnya tidak ikut memakai material Rock
     }

@@ -133,6 +133,27 @@ var LIBS = {
 
     set_position: function (m, x, y, z) {
         m[12] = x, m[13] = y, m[14] = z;
+    },
+
+    // ROTASI TERHADAP SUMBU SEMBARANG (rumus Rodrigues).
+    //   titik = [x, y, z] yang dilewati sumbu, arah = [x, y, z] arah sumbu (tidak harus sejajar X/Y/Z),
+    //   sudut = radian (positif = berlawanan jarum jam bila dilihat dari ujung arah sumbu).
+    // Hasil = T(titik) x R(arah, sudut) x T(-titik): geser ke pivot, putar, geser balik.
+    rotasiSumbu: function (titik, arah, sudut) {
+        var p = Math.sqrt(arah[0] * arah[0] + arah[1] * arah[1] + arah[2] * arah[2]) || 1;
+        var x = arah[0] / p, y = arah[1] / p, z = arah[2] / p;
+        var c = Math.cos(sudut), s = Math.sin(sudut), t = 1 - c;
+        var m = [
+            c + x * x * t,     x * y * t + z * s, x * z * t - y * s, 0,   // kolom 0
+            x * y * t - z * s, c + y * y * t,     y * z * t + x * s, 0,   // kolom 1
+            x * z * t + y * s, y * z * t - x * s, c + z * z * t,     0,   // kolom 2
+            0, 0, 0, 1,
+        ];
+        // translasi = titik - R x titik  (supaya titik pada sumbu tidak bergeser)
+        m[12] = titik[0] - (m[0] * titik[0] + m[4] * titik[1] + m[8] * titik[2]);
+        m[13] = titik[1] - (m[1] * titik[0] + m[5] * titik[1] + m[9] * titik[2]);
+        m[14] = titik[2] - (m[2] * titik[0] + m[6] * titik[1] + m[10] * titik[2]);
+        return m;
     }
 
     

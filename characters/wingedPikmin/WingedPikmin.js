@@ -12,6 +12,8 @@ import { poseBerdiri } from "./animation/Berdiri.js";
 import { poseTerbang } from "./animation/Terbang.js";
 import { melambai } from "./animation/Melambai.js";
 import { mengangguk } from "./animation/Mengangguk.js";
+import { angkat } from "./animation/Angkat.js";
+import { mataBergantian } from "./animation/MataBergantian.js";
 
 // Daftar animasi: dipakai setPose(nama) dan urutan di animation/urutan.js.
 // Animasi baru: buat file di animation/, lalu daftarkan namanya di sini.
@@ -20,11 +22,13 @@ export const DAFTAR_ANIMASI = {
     terbang: poseTerbang,
     melambai: melambai,
     mengangguk: mengangguk,
+    angkat: angkat,
+    mataBergantian: mataBergantian,
 };
 
 // Pose dasar (semua sendi 0) sebelum animasi diterapkan
 function poseKosong() {
-    return { kepala: 0, badan: 0, lengan: { angkat: 0, ayun: 0, siku: 0 }, kaki: { ayun: 0 } };
+    return { kepala: 0, badan: 0, lengan: { angkat: 0, ayun: 0, siku: 0 }, kaki: { ayun: 0 }, mata: { kiri: 1, kanan: 1 } };
 }
 
 const LEHER_Y = -0.5;
@@ -75,7 +79,14 @@ export class WingedPikmin {
 
     render(shaderVars, parentMatrix, time) {
         // Kalau urutan sedang diputar: timeline mengisi this.pose dan menggeser posisi karakter
-        if (this.timeline) parentMatrix = this.timeline.terapkan(this, parentMatrix);
+        if (this.timeline) {
+            parentMatrix = this.timeline.terapkan(this, parentMatrix);
+        } else {
+            // Tanpa urutan: animasi pilihan setPose berjalan terus (supaya animasi bergerak seperti
+            // mataBergantian juga hidup di halaman tes, bukan hanya di urutan)
+            this.pose = poseKosong();
+            DAFTAR_ANIMASI[this.namaPose](this, 1, performance.now() / 1000, {});
+        }
 
         // Antena bergoyang dan sayap mengepak mengikuti waktu
         var wobbleFactor = Math.sin(time) * 0.1;
@@ -84,7 +95,7 @@ export class WingedPikmin {
         var HEAD = mul(parentMatrix, RX(pose.kepala));
         var BODY = mul(parentMatrix, T(0, LEHER_Y, 0), RX(pose.badan), T(0, -LEHER_Y, 0));
 
-        this.headAndBody.render(shaderVars, HEAD, BODY);
+        this.headAndBody.render(shaderVars, HEAD, BODY, pose.mata);
         this.limbs.render(shaderVars, BODY, pose);
         this.antenna.render(shaderVars, HEAD, wobbleFactor);
         this.wing.render(shaderVars, BODY, time);

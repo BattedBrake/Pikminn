@@ -8,6 +8,8 @@ export function poseBerdiri(pikmin) {
     pose.badan.miring = 0;
     pose.badan.toleh = 0;
     pose.badan.naik = 0;
+    pose.badan.napas = 1;      // 1 = bernapas normal, 0 = tidak bernapas (lihat terapkanPose di RedPikmin.js)
+    pose.mata.pupil = 1;       // ukuran pupil (1 = normal)
     ["kiri", "kanan"].forEach(function (sisi) {
         pose.lengan[sisi].bahuZ = SUDUT_AWAL * PI / 180;
         pose.lengan[sisi].bahuX = 0;

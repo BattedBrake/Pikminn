@@ -24,6 +24,24 @@
 //            360 = satu putaran penuh (berguling)
 //   Langkah yang tidak menulis miring/guling kembali tegak (0).
 //
+// LOMPAT: posisi y naik-turun berkali-kali selama SATU langkah (translate di sumbu y), sementara animasi
+//   langkah itu (misalnya melambai) tetap berjalan mulus tanpa terputus.
+//   lompat: { tinggi: 1.2, kali: 10 }
+//     tinggi : tinggi lompatan (default 1)
+//     kali   : jumlah lompatan selama langkah (default: satu lompatan tiap 0.7 detik)
+//
+// ORBIT (ROTATE ARBITRARY AXIS): karakter diputar UTUH mengelilingi sebuah sumbu selama langkah itu.
+//   orbit: { pusat: [x, z], putaran: 360, miring: 0 }
+//     pusat   : titik yang dilewati sumbu, [x, z] (sumbu setinggi karakter) atau [x, y, z] (y = tinggi di atas tanah)
+//     putaran : derajat yang ditempuh selama langkah (default 360 = satu keliling; negatif = arah sebaliknya)
+//     miring  : condongkan sumbu (derajat) dari tegak, sehingga lintasan naik-turun (default 0 = sumbu tegak).
+//               Sumbu dicondongkan ke arah gerak awal, jadi lingkaran tetap berpusat di sumbu dan
+//               karakter naik-turun setinggi jari-jari x sin(miring) di atas & di bawah ketinggian awalnya
+//     sumbu   : (opsional) arah sumbu [x, y, z] sendiri, menggantikan miring
+//   Matriksnya: T(pusat) x R(sumbu, sudut) x T(-pusat) (LIBS.rotasiSumbu), bukan pindah titik demi titik.
+//   Karakter otomatis menghadap arah putaran (kalau hadap tidak diisi). Langkah berikutnya kembali ke posisi
+//   sebelum orbit, jadi pakai putaran kelipatan 360 supaya tidak meloncat.
+//
 // SYARAT ANIMASI: fungsi (pikmin, progres, waktu, langkah) yang HANYA mengisi pikmin.pose.
 //   progres = 0..1 sepanjang durasi langkah, waktu = detik sejak langkah dimulai,
 //   langkah = objek langkah dari urutan (bisa berisi pengaturan tambahan, misalnya kecepatan).
@@ -53,6 +71,23 @@ function campurSudut(a, b, k) {
     while (d > Math.PI) d -= 2 * Math.PI;
     while (d < -Math.PI) d += 2 * Math.PI;
     return a + d * k;
+}
+
+// Ubah pengaturan orbit dari urutan menjadi pusat, arah sumbu, dan sudut total (radian).
+// awal = posisi karakter saat orbit dimulai (dipakai untuk menentukan arah condong sumbu).
+function siapkanOrbit(o, awal) {
+    var tiga = o.pusat.length === 3;
+    var px = o.pusat[0], pz = tiga ? o.pusat[2] : o.pusat[1];
+    var m = (o.miring || 0) * Math.PI / 180;
+    // arah singgung (tegak lurus jari-jari di bidang datar): sumbu dicondongkan ke sini
+    var rx = awal[0] - px, rz = awal[2] - pz, rl = Math.hypot(rx, rz) || 1;
+    var tx = rz / rl, tz = -rx / rl;
+    return {
+        px: px, pz: pz,
+        py: tiga ? o.pusat[1] : null,                      // null = setinggi karakter
+        sumbu: o.sumbu || [Math.sin(m) * tx, Math.cos(m), Math.sin(m) * tz],
+        sudut: (o.putaran !== undefined ? o.putaran : 360) * Math.PI / 180,
+    };
 }
 
 function kali(a, b) {
@@ -86,6 +121,7 @@ export class Timeline {
         this.posAwal = [];
         this.posAkhir = [];
         this.arah = [];
+        this.orbit = [];
         this.miring = [];
         this.guling = [];
         this.total = 0;
@@ -100,8 +136,15 @@ export class Timeline {
             this.posAkhir.push(b);
             var dx = b[0] - a[0], dz = b[2] - a[2];
             if (l.hadap !== undefined) arah = l.hadap * Math.PI / 180;
+            else if (l.orbit && opsi.hadapOtomatis !== false) {
+                // menghadap arah singgung lingkaran orbit (arah karakter bergerak saat diputar)
+                var o = l.orbit, opz = o.pusat[o.pusat.length === 3 ? 2 : 1];
+                var rx = a[0] - o.pusat[0], rz = a[2] - opz, tanda = (o.putaran !== undefined ? o.putaran : 360) >= 0 ? 1 : -1;
+                arah = Math.atan2(rz * tanda, -rx * tanda);
+            }
             else if (opsi.hadapOtomatis !== false && Math.abs(dx) + Math.abs(dz) > 1e-6) arah = Math.atan2(dx, dz);
             this.arah.push(arah);
+            this.orbit.push(l.orbit ? siapkanOrbit(l.orbit, a) : null);
             this.miring.push((l.miring || 0) * Math.PI / 180);
             this.guling.push((l.guling || 0) * Math.PI / 180);
             pos = b;
@@ -177,16 +220,41 @@ export class Timeline {
         this.miringSekarang = miringSebelum + (this.miring[i] - miringSebelum) * k;
         this.gulingSekarang = gulingSebelum + (this.guling[i] - gulingSebelum) * k;
 
+        // Orbit: sudut bertambah rata selama langkah
+        this.orbitSekarang = this.orbit[i] ? Object.assign({ sudutSekarang: this.orbit[i].sudut * progres }, this.orbit[i]) : null;
+
         // Posisi: bergerak lurus dari posAwal ke posAkhir selama langkah
         var a = this.posAwal[i], b = this.posAkhir[i];
-        return [a[0] + (b[0] - a[0]) * progres, a[1] + (b[1] - a[1]) * progres, a[2] + (b[2] - a[2]) * progres];
+        var naik = 0;
+        if (langkah.lompat) {
+            // |sin| membentuk busur: naik cepat, melambat di puncak, turun, menyentuh tanah, lalu lompat lagi
+            var tinggi = langkah.lompat.tinggi !== undefined ? langkah.lompat.tinggi : 1;
+            var kali = langkah.lompat.kali !== undefined ? langkah.lompat.kali : Math.max(1, Math.round(langkah.durasi / 0.7));
+            naik = tinggi * Math.abs(Math.sin(Math.PI * kali * progres));
+        }
+        return [a[0] + (b[0] - a[0]) * progres, a[1] + (b[1] - a[1]) * progres + naik, a[2] + (b[2] - a[2]) * progres];
     }
 
     // Update pose, lalu kembalikan parent x geser(posisi + tinggi tanah) x hadap x miring x guling x skala
     terapkan(pikmin, parentMatrix) {
         var p = this.update(pikmin);
+        var y = p[1] + this.tanah(p[0], p[2]);
+
+        // ORBIT: parent x [koreksi tinggi tanah] x T(pusat) x R(sumbu, sudut) x T(-pusat) x ...
+        if (this.orbitSekarang) {
+            var o = this.orbitSekarang;
+            var py = o.py !== null ? o.py + this.tanah(o.px, o.pz) : y;
+            var R = LIBS.rotasiSumbu([o.px, py, o.pz], o.sumbu, o.sudutSekarang);
+            // posisi karakter setelah diputar: kaki tetap menempel di tanah yang bergelombang
+            var qx = R[0] * p[0] + R[4] * y + R[8] * p[2] + R[12];
+            var qz = R[2] * p[0] + R[6] * y + R[10] * p[2] + R[14];
+            var koreksi = LIBS.get_I4();
+            LIBS.set_position(koreksi, 0, this.tanah(qx, qz) - this.tanah(p[0], p[2]), 0);
+            parentMatrix = kali(kali(parentMatrix, koreksi), R);
+        }
+
         var geser = LIBS.get_I4();
-        LIBS.set_position(geser, p[0], p[1] + this.tanah(p[0], p[2]), p[2]);
+        LIBS.set_position(geser, p[0], y, p[2]);
         var hadap = LIBS.get_I4();
         LIBS.rotateY(hadap, this.arahSekarang);
         var miring = LIBS.get_I4();

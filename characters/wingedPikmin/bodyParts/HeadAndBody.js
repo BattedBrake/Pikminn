@@ -15,7 +15,8 @@ export class HeadAndBody {
     }
 
     // headMatrix = sendi kepala (kepala & mata), bodyMatrix = sendi badan
-    render(shaderVars, headMatrix, bodyMatrix) {
+    // mata = { kiri, kanan }: skala tiap mata di bidang wajah (1 = normal), kiri = mata di x negatif
+    render(shaderVars, headMatrix, bodyMatrix, mata = { kiri: 1, kanan: 1 }) {
         const GL = this.gl;
         const STRIDE = 4 * 9;
 
@@ -82,7 +83,7 @@ export class HeadAndBody {
         LIBS.translateX(LOCAL_OVAL_MATA1, -0.6);
         LIBS.translateY(LOCAL_OVAL_MATA1, 0.2);
         LIBS.translateZ(LOCAL_OVAL_MATA1, 1.2);
-        LIBS.scale(LOCAL_OVAL_MATA1, 0.5, 0.565, 0.1);
+        LIBS.scale(LOCAL_OVAL_MATA1, 0.5 * mata.kiri, 0.565 * mata.kiri, 0.1);   // tebal tetap supaya tidak masuk ke kepala
         var FINAL_OVAL_MATA1 = LIBS.get_I4();
         LIBS.multiply(FINAL_OVAL_MATA1, headMatrix, LOCAL_OVAL_MATA1);
         GL.uniform3f(shaderVars.uColor, 0.28, 0.78, 0.92);
@@ -94,7 +95,7 @@ export class HeadAndBody {
         LIBS.translateX(LOCAL_OVAL_MATA2, 0.6);
         LIBS.translateY(LOCAL_OVAL_MATA2, 0.2);
         LIBS.translateZ(LOCAL_OVAL_MATA2, 1.2);
-        LIBS.scale(LOCAL_OVAL_MATA2, 0.5, 0.565, 0.1); 
+        LIBS.scale(LOCAL_OVAL_MATA2, 0.5 * mata.kanan, 0.565 * mata.kanan, 0.1); 
         var FINAL_OVAL_MATA2 = LIBS.get_I4();
         LIBS.multiply(FINAL_OVAL_MATA2, headMatrix, LOCAL_OVAL_MATA2);
         GL.uniform3f(shaderVars.uColor, 0.28, 0.78, 0.92);

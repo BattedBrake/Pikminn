@@ -1,4 +1,5 @@
 import { createScene, place } from "./shared/renderer.js";
+import { LIBS } from "./shared/libs.js";
 import { Sun } from "./environment/sun.js";
 import { Environment, tinggiTanah } from "./environment/Environment.js";
 
@@ -34,9 +35,22 @@ import { melambai } from "./characters/wingedPikmin/animation/Melambai.js";
 //     lainnya : pengaturan tambahan animasi, misalnya kecepatan
 //
 // Animasi yang tersedia:
-//   red    : normal, jalan, tutupMata, melambai            (characters/redPikmin/RedPikmin.js)
-//   winged : normal, terbang, melambai, mengangguk         (characters/wingedPikmin/WingedPikmin.js)
-//   rock   : normal, jalan, melambai                       (characters/rockPikmin/RockPikmin.js)
+//   red    : normal, jalan, tutupMata, melambai, kaget     (characters/redPikmin/RedPikmin.js)
+//   winged : normal, terbang, melambai, mengangguk, angkat, mataBergantian (characters/wingedPikmin/WingedPikmin.js)
+//   rock   : normal, jalan, melambai, kaget, tangis        (characters/rockPikmin/RockPikmin.js)
+//   kaget  : pupil membesar. Pakai bersama animasi lain, misalnya ["normal", "kaget"].
+//            Pengaturan: pupil = ukuran pupil (default red 1.6, rock 1.35)
+//   tangis : badan Rock melebar lalu kembali beberapa kali, misalnya ["normal", "tangis"].
+//            Pengaturan: kali (default 3), periode (detik, default 1.2), mulai (detik, default 1), lebar (default 0.22)
+//   mataBergantian : mata Winged membesar-mengecil bergantian (kiri besar saat kanan kecil, lalu sebaliknya).
+//            Pakai bersama animasi lain, misalnya ["terbang", "mataBergantian"].
+//            Pengaturan: kecepatan (default 4), besar (default 0.25 = 1.25x .. 0.75x)
+//   lompat : (opsional, per langkah) naik-turun berkali-kali selama langkah itu, misalnya
+//            lompat: { tinggi: 1.2, kali: 12 }   (animasi seperti melambai tetap berjalan mulus)
+//   orbit  : (opsional, per langkah) diputar mengelilingi sumbu sembarang, misalnya
+//            orbit: { pusat: [x, z], putaran: 360, miring: 20 }   (lihat shared/timeline.js)
+//   angkat : tangan Winged memegang benda (peti). Pengaturan: menuju: true = tangan bergerak halus ke posisi memegang,
+//            lebar (default 0.45), cengkram (default 0.2)
 //   chest  : tertutup, buka, terbuka, tutup                (environment/chest.js)
 //   kunci  : diam, putar, melayang                         (environment/skeletonKey.js)
 //   Chest & kunci tidak berbelok otomatis saat dipindah (pakai hadap kalau ingin memutarnya).
@@ -44,6 +58,43 @@ import { melambai } from "./characters/wingedPikmin/animation/Melambai.js";
 //
 // Kalau ulang = true, posisi kembali ke awal saat urutan diulang: buat langkah terakhir kembali ke posisi awal.
 // Sumbu: x = kiri(-)/kanan(+), z = jauh(-)/dekat kamera(+).
+// =====================================================================================
+// POSISI RUMAH (KOPDES) & PINTU
+// =====================================================================================
+// Kopdes aslinya menghadap +z (arah menjauhi pikmin yang datang dari z kecil), jadi pikmin & kunci
+// sampai di DINDING BELAKANG. Sekarang rumah diputar 180 derajat supaya pintunya menghadap -z
+// (ke arah datangnya pikmin & kunci), dan x rumah disamakan dengan x kunci (-14).
+//   x, z   : posisi tengah rumah.   skala : ukuran rumah.   (pintu ada di 2.51 * skala di depan tengah rumah)
+const KOPDES = { x: -14, z: 152, skala: 2.8 };
+// Dasar rumah diturunkan ke titik tanah TERENDAH di bawah alasnya supaya tidak ada celah melayang
+// di sisi yang tanahnya lebih rendah (tanah bergelombang sekitar 0.6).
+var DASAR_KOPDES = (function () {
+    var rendah = Infinity;
+    for (var dx = -14.7; dx <= 14.7; dx += 1.05) {
+        for (var dz = -13.4; dz <= 13.4; dz += 1.05) {
+            rendah = Math.min(rendah, tinggiTanah(KOPDES.x + dx, KOPDES.z + dz));
+        }
+    }
+    return rendah - 0.05;
+})();
+// Titik pintu di dunia (setelah diputar 180 derajat): tepat di tengah-depan rumah
+const PINTU = {
+    x: KOPDES.x,
+    z: KOPDES.z - 2.51 * KOPDES.skala,       // bidang pintu (z = 144.97)
+    tinggi: 1.55 * KOPDES.skala,             // tengah pintu di atas dasar rumah (pintu kayu di y = 1.55 lokal)
+};
+const DEPAN_TANGGA = KOPDES.z - 4.8 * KOPDES.skala;   // ujung tangga depan (z = 138.56)
+// Titik akhir di depan rumah (sudah ditulis langsung sebagai angka di ADEGAN):
+//   red    [-12.2, 0, 137.06]   rock [-15.8, 0, 137.06]   : sejajar di depan tangga, kiri-kanan pintu
+//   winged [-9, 3.5, 135.56]                               : melayang di sisi kanan supaya tidak menutupi pintu & kunci
+//   kunci  [-14, 4.1, 144.07]                              : setinggi tengah pintu, 0.9 di depan daun pintu
+// Kalau KOPDES dipindah, titik-titik ini perlu disesuaikan juga.
+
+// Winged menunggu di belakang peti (peti di z = 15, engselnya di sisi belakang z = 13.95).
+// Tutup peti yang terbuka berdiri tegak di sisi belakang sampai z = 13.2, jadi z winged harus cukup kecil
+// supaya badannya (radius sekitar 1.2) tidak tertabrak tutup. Makin kecil = makin jauh dari peti.
+const JARAK_WINGED_Z = 10;
+
 const ADEGAN = {
     red: {
         posisi: [5, 0, 2], skala: 0.75, arahAwal: 0, ulang: false,
@@ -54,15 +105,20 @@ const ADEGAN = {
             { animasi: ["normal" , "melambai"],    durasi: 4 , hadap : -90 },
             { animasi: "jalan",     durasi: 3, ke: [-11, 0, 14] }, 
             { animasi: "melambai",    durasi: 3 },    
-            { animasi: "normal",    durasi: 23 },
-            { animasi: "normal",    durasi: 3, miring : -30,},
+            { animasi: "normal",    durasi: 10 },
+            { animasi: "normal", durasi: 13 },
+            { animasi: ["normal", "kaget"],    durasi: 3, miring : -30,},
             { animasi: "normal",    durasi: 2, miring : 0,},
             { animasi: "normal",    durasi: 1},
             { animasi: "normal",    durasi: 1.6, hadap :0},
-            { animasi: "normal",    durasi: 0.1, ke: [-11, 1, 14]},
+            { animasi: ["normal", "kaget"],    durasi: 0.1, ke: [-11, 1, 14]},
             { animasi: "normal",    durasi: 0.1, ke: [-11, 0, 14]},
             { animasi: "normal",    durasi: 2},
-            { animasi: "jalan",    durasi: 40, ke: [-11, 0, 130] },
+            { animasi: "jalan",    durasi: 40, ke: [-12.2, 0, 137.06] },
+            // penutup: berbalik, lalu melompat-lompat sambil melambai
+            { animasi: "normal",   durasi: 1, hadap: 180 },
+            { animasi: ["normal", "melambai"], durasi: 12, hadap: 180, lompat: { tinggi: 1.2, kali: 16 } },
+            { animasi: ["normal", "melambai"], durasi: 3, hadap: 180 },
         ],
     },
     winged: {
@@ -74,18 +130,26 @@ const ADEGAN = {
             { animasi: ["terbang", "melambai"],  durasi: 2, hadap: 0 },
             { animasi: "terbang",                durasi: 3, ke: [-15, 4, 12] }, 
             { animasi: ["normal", "melambai"],  durasi: 15, hadap: 0 , miring : 60},
-            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : 60, ke: [-14,-1,15]},
-            { animasi: ["normal"],  durasi: 2, hadap: 0 , miring : 60},
-            { animasi: ["normal"],  durasi: 1, hadap: 0 , miring : 60, ke: [-14,0,15]},
-            { animasi: ["normal"],  durasi: 2, hadap: 0 , miring : 60, ke: [-14,-1,15]},
-            { animasi: ["normal"],  durasi: 2, hadap: 0 , miring : 60},
-            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : 60, ke: [-14,3,15]},
-            { animasi: ["normal", "melambai"],  durasi: 5, hadap: 0 , miring : 30, ke: [-14,1,12]},
-            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : -30, ke: [-14,1,12]},
+            { animasi: ["normal", "angkat"],  durasi: 3, hadap: 0 , miring : 60, ke: [-14,-1,15], menuju: true },
+            { animasi: ["normal", "angkat"],  durasi: 2, hadap: 0 , miring : 60},
+            { animasi: ["normal", "angkat","mataBergantian"],  durasi: 1, hadap: 0 , miring : 60, ke: [-14,0,15]},
+            { animasi: ["normal", "angkat"],  durasi: 2, hadap: 0 , miring : 60, ke: [-14,-1,15]},
+            { animasi: ["normal", "angkat"],  durasi: 2, hadap: 0 , miring : 60},
+            { animasi: ["normal", "angkat","mataBergantian"],  durasi: 3, hadap: 0 , miring : 60, ke: [-14,3,15]},
+            { animasi: ["normal", "melambai"],  durasi: 2, hadap: 0 , miring : 30, ke: [-14,1,JARAK_WINGED_Z]},
+            { animasi: ["normal", "melambai"],  durasi: 3, hadap: 0 , miring : 30},
+            { animasi: ["normal", "kaget"],  durasi: 3, hadap: 0 , miring : -30, ke: [-14,1,JARAK_WINGED_Z]},
             { animasi: "normal",    durasi: 2, miring : 0,},
-            { animasi: ["normal", "melambai"],  durasi: 1, ke: [-14,3,12]},
+            { animasi: ["normal", "melambai"],  durasi: 1, ke: [-14,3,JARAK_WINGED_Z]},
             { animasi: "normal",                 durasi: 2.2 },
-            { animasi: "terbang",                durasi: 40, ke: [-14, 3, 130] },
+            { animasi: "terbang",                durasi: 40, ke: [-9, 3.5, 135.56] },
+            // penutup: menunggu Red & Rock sampai (1.6 detik lebih cepat), berbalik, lalu naik-turun sambil melambai
+            // dan berputar di tempat 3 kali (orbit dengan pusat = posisi Winged sendiri -> sumbu tegak menembus badannya)
+            { animasi: "terbang",                durasi: 1.6 },
+            { animasi: "terbang",                durasi: 1, hadap: 180 },
+            { animasi: ["terbang", "melambai", "mataBergantian"], durasi: 12, hadap: 180, lompat: { tinggi: 1.5, kali: 12 },
+              orbit: { pusat: [-9, 135.56], putaran: 1080 } },
+            { animasi: ["terbang", "melambai"],  durasi: 3, hadap: 180 },
 
         ],
     },
@@ -94,19 +158,29 @@ const ADEGAN = {
         urutan: [
             { animasi: "jalan",    durasi: 10, ke: [35, 0, 4] },
             { animasi: "normal",   durasi: 3 },
-            { animasi: "jalan",    durasi: 3, ke: [-15, 0, 15] },
-            { animasi: "normal",   durasi: 15, miring : 90 },
+            // titik jatuh digeser ke x = -17 (sebelumnya -15 = tepat di tepi chest di x = -14, lebar 2.1),
+            // supaya saat bangkit & berdiri menghadap chest, kaki/badan Rock tidak menembus peti
+            { animasi: "jalan",    durasi: 3, ke: [-17, 0, 15] },
+            // menangis saat berbaring: badan melebar lalu kembali, 3 kali (atur: kali, periode, mulai, lebar)
+            { animasi: ["normal", "tangis"], durasi: 15, miring : 90, kali: 3, periode: 1.2, mulai: 1, lebar: 0.22 },
             { animasi: "normal",   durasi: 2, miring : 0 , hadap : 90 },
             { animasi: "jalan",   durasi: 3, miring : 0, hadap : 90, ke: [-18,0,15]},
-            { animasi: "normal",   durasi: 20 },
-            { animasi: "normal",   durasi: 3, miring : -30,},
+            { animasi: "normal",   durasi: 7 },
+            // kaget: pupil membesar sejak peti mulai muncul (detik ke-43) sampai kunci selesai muncul (detik ke-56)
+            // lalu kembali ke ukuran normal. Ukuran bisa diubah lewat pupil: 1.35
+            { animasi: ["normal", "kaget"], durasi: 13 },
+            { animasi: ["normal", "kaget"],   durasi: 3, miring : -30,},
             { animasi: "normal",    durasi: 2, miring : 0,},
             { animasi: "normal",    durasi: 1},
             { animasi: "normal",    durasi: 1.6, hadap :0},
-            { animasi: "normal",    durasi: 0.1, ke: [-18,1,15]},
+            { animasi: ["normal", "kaget"],    durasi: 0.1, ke: [-18,1,15]},
             { animasi: "normal",    durasi: 0.1, ke: [-18,0,15]},
             { animasi: "normal",    durasi: 2},
-            { animasi: "jalan",    durasi: 40, ke: [-18, 0, 130] },
+            { animasi: "jalan",    durasi: 40, ke: [-15.8, 0, 137.06] },
+            // penutup: berbalik, lalu melompat-lompat sambil melambai (sedikit lebih lambat dari Red supaya tidak seragam)
+            { animasi: "normal",   durasi: 1, hadap: 180 },
+            { animasi: ["normal", "melambai"], durasi: 12, hadap: 180, lompat: { tinggi: 1, kali: 14 } },
+            { animasi: ["normal", "melambai"], durasi: 3, hadap: 180 },
 
         ],
     },
@@ -119,6 +193,11 @@ const ADEGAN = {
             { animasi: "tertutup", ke: [-14, -1.5, 15], durasi : 2 },
             { animasi: "tertutup", ke: [-14, 2, 15], durasi : 3 },
             { animasi: "tertutup", ke: [-14, 0, 15], durasi : 0.5 },
+            // tutup peti terbuka dulu (detik 53 - 55), baru kunci keluar (detik 55 - 56, lihat "kunci")
+            { animasi: "tertutup", durasi : 1.5 },
+            { animasi: "buka",     durasi : 2 },
+            { animasi: "terbuka",  durasi : 6 },    // tetap terbuka sampai kunci menjauh (detik 55 - 61)
+            { animasi: "tutup",    durasi : 1.5 },  // lalu menutup lagi supaya winged yang terbang lewat nanti tidak menabrak tutup
         ],
     },
     kunci: {
@@ -129,10 +208,20 @@ const ADEGAN = {
             { animasi: "diam", durasi: 3},
             { animasi: "diam", durasi: 1, ke: [-14, 2.4, 17] },
             { animasi: "diam", durasi: 1, miring : -90},
-            { animasi: "diam", durasi: 40, miring : -90, ke: [-14, 2.4, 140] },
+            { animasi: "diam", durasi: 40, miring : -90, ke: [-14, 4.1, 144.07] },
         ],
     },
 };
+
+// Matriks rumah: diletakkan di KOPDES, diputar 180 derajat (pintu menghadap -z).
+function matriksKopdes(root) {
+    var m = place(root, KOPDES.x, DASAR_KOPDES, KOPDES.z, KOPDES.skala);
+    var putar = LIBS.get_I4();
+    LIBS.rotateY(putar, Math.PI);
+    var hasil = LIBS.get_I4();
+    LIBS.multiply(hasil, m, putar);
+    return hasil;
+}
 
 // Pasang urutan ke karakter. y posisi otomatis ditambah tinggi pasir & tinggi kaki karakter.
 function pasangAdegan(karakter, Kelas, atur) {
@@ -157,9 +246,6 @@ function main() {
         tinggiMin: function (x, z) { return tinggiTanah(x, z) + 1; },   // kamera tidak bisa menembus tanah
     });
     if (!scene) return;
-
-    // Petunjuk tombol + koordinat kamera (berguna untuk mengisi posisi/ke di ADEGAN)
-    var petunjuk = document.querySelector("#petunjuk span");
 
     var environment = new Environment(scene.GL);
     var wingedPikmin = new WingedPikmin(scene.GL);
@@ -190,28 +276,45 @@ function main() {
         tepi: 1200,
     });
 
-    // Rumput: helai dari tabung Bezier (seperti tangkai pikmin), dikelompokkan per rumpun
+    // Rumput: helai pipih mengikuti kurva Bezier, dikelompokkan per rumpun.
+    // Dibuat 2 lapis: lapis RAPAT hanya di area tempat adegan berlangsung (x -60..60, z -30..175), dan lapis JARANG
+    // yang tipis untuk mengisi sisa tanah yang luas. Sebelumnya 50.000 helai disebar di tanah 1000 x 1000
+    // sehingga hanya tampak jarum-jarum terpisah. Rumah tidak ditembus rumput berkat kotak "kosong".
+    var kosongRumah = [{
+        xMin: KOPDES.x - 17, xMax: KOPDES.x + 17,
+        zMin: DEPAN_TANGGA - 4, zMax: KOPDES.z + 16,
+    }];
     var rumput = new Rumput(scene.GL, {
-        jumlah: 5000,             // banyak rumpun
-        helaiPerRumpun: 10,        // helai per rumpun
-        seed: 3,                  // ganti angka untuk susunan yang berbeda
-        area: { xMin: -1000, xMax: 1000, zMin: -1000, zMax: 1000 },   // kotak sebaran rumput
-        tinggiMin: 1,           // panjang helai terpendek
-        tinggiMax: 1.8,           // panjang helai terpanjang
-        condong: 0.5,    
-       
-        // warnaBawah: [0.13, 0.35, 0.08], warnaAtas: [0.55, 0.85, 0.25],   // warna pangkal & ujung helai
+        jumlah: 4500,
+        helaiPerRumpun: 9,
+        seed: 3,
+        area: { xMin: -60, xMax: 60, zMin: -30, zMax: 175 },
+        kosong: kosongRumah,
+        tinggiMin: 1,
+        tinggiMax: 1.8,
+        condong: 0.5,
     });
-
+    var rumputJauh = new Rumput(scene.GL, {
+        jumlah: 2500,
+        helaiPerRumpun: 7,
+        seed: 11,
+        area: { xMin: -300, xMax: 300, zMin: -300, zMax: 300 },
+        kosong: kosongRumah.concat([{ xMin: -60, xMax: 60, zMin: -30, zMax: 175 }]),   // area rapat sudah terisi lapis pertama
+        tinggiMin: 1,
+        tinggiMax: 1.8,
+        condong: 0.5,
+        lebarRumpun: 1.0,
+    });
 
     scene.run(function (shaderVars, root, time) {
         sun.render(shaderVars, root, time);        
         environment.render(shaderVars, root);  
         hutan.render(shaderVars, root);
         rumput.render(shaderVars, root);
+        rumputJauh.render(shaderVars, root);
 
         // Item environment: place(root, x, y, z, skala), y = tinggiTanah(x, z) supaya menempel di pasir
-        kopdes.render(shaderVars, place(root, -14, tinggiTanah(0, -14), 160, 2.8));
+        kopdes.render(shaderVars, matriksKopdes(root));
 
         // Chest & kunci: posisi & gerakan diatur oleh ADEGAN di atas
         chest.render(shaderVars, root);
@@ -221,11 +324,6 @@ function main() {
         wingedPikmin.render(shaderVars, root, time);
         redPikmin.render(shaderVars, root, time);
         rockPikmin.render(shaderVars, root, time);
-
-        if (petunjuk) {
-            var p = scene.posisiKamera();
-            petunjuk.textContent ="kamera: [" + p[0].toFixed(1) + ", " + p[1].toFixed(1) + ", " + p[2].toFixed(1) + "]";
-        }
     });
 }
 
