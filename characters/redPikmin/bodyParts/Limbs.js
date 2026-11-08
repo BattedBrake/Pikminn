@@ -10,35 +10,46 @@ import {
 export class Limbs {
     constructor(GL, badan) {
         // ---------- LENGAN : 12 cylinder kecil + bola di tiap sambungan, 3 jari = elliptic paraboloid ----------
-        this.lengan = [];
-        for (var sx of [-1, 1]) {
-            var ruasLengan = [];
-            var induk = badan;
-            for (var i = 0; i < JUMLAH_RUAS; i++) {
-                var r0 = RADIUS_BAHU + (RADIUS_UJUNG - RADIUS_BAHU) * i / JUMLAH_RUAS;
-                var r1 = RADIUS_BAHU + (RADIUS_UJUNG - RADIUS_BAHU) * (i + 1) / JUMLAH_RUAS;
-                // cylinder dibalik (putarZ PI) supaya menghadap ke bawah, bola kecil menutup sambungan di ujungnya
-                var silinder = S.putarZ(S.cylinder(r0, r1, PANJANG_RUAS, MERAH), PI);
-                var bola = S.geser(S.ellipsoid(r1, r1, r1, MERAH), 0, -PANJANG_RUAS, 0);
-                var ruas = new MyObject(GL, S.gabung(silinder, bola));
-                if (i > 0) {
-                    // ruas ini mulai di ujung ruas sebelumnya, dan miring sedikit lebih tegak
-                    LIBS.translateY(ruas.MOVE_MATRIX, -PANJANG_RUAS);
-                    LIBS.rotateZ(ruas.MOVE_MATRIX, sx * (SUDUT_AKHIR - SUDUT_AWAL) / JUMLAH_RUAS * PI / 180);
-                }
-                induk.childs.push(ruas);
-                ruasLengan.push(ruas);
-                induk = ruas;
+        // ---------- LENGAN (EXPLODED VIEW) ----------
+    this.lengan = [];
+    var GAP = 0; // Jarak pemisah antar ruas (makin besar = makin renggang melayang)
+
+    for (var sx of [-1, 1]) {
+        var ruasLengan = [];
+        var induk = badan;
+        for (var i = 0; i < JUMLAH_RUAS; i++) {
+            var r0 = RADIUS_BAHU + (RADIUS_UJUNG - RADIUS_BAHU) * i / JUMLAH_RUAS;
+            var r1 = RADIUS_BAHU + (RADIUS_UJUNG - RADIUS_BAHU) * (i + 1) / JUMLAH_RUAS;
+            
+            // 1. Silinder Ruas (Objek Utama)
+            var silinderMesh = S.putarZ(S.cylinder(r0, r1, PANJANG_RUAS, MERAH), PI);
+            var ruas = new MyObject(GL, silinderMesh);
+
+            // 2. Bola Sendi (Objek Terpisah & Digeser Melayang di Bawah Silinder)
+            var bolaMesh = S.ellipsoid(r1, r1, r1, MERAH);
+            var bolaSendi = new MyObject(GL, bolaMesh);
+            LIBS.translateY(bolaSendi.MOVE_MATRIX, -PANJANG_RUAS - GAP * 0.5);
+            ruas.childs.push(bolaSendi);
+
+            if (i > 0) {
+                // Beri jarak (GAP) ekstra antar ruas silinder
+                LIBS.translateY(ruas.MOVE_MATRIX, -(PANJANG_RUAS + GAP));
+                LIBS.rotateZ(ruas.MOVE_MATRIX, sx * (SUDUT_AKHIR - SUDUT_AWAL) / JUMLAH_RUAS * PI / 180);
             }
-            // 3 jari di ujung ruas terakhir, membuka seperti kipas
-            for (var ang of [-0.5, 0, 0.5]) {
-                var jari = new MyObject(GL, S.elipticParaboloid(0.035, 0.025, 0.34, MERAH));
-                LIBS.translateY(jari.MOVE_MATRIX, -PANJANG_RUAS);
-                LIBS.rotateZ(jari.MOVE_MATRIX, PI + ang * 0.9);
-                induk.childs.push(jari);
-            }
-            this.lengan.push({ sx: sx, ruas: ruasLengan });
+            induk.childs.push(ruas);
+            ruasLengan.push(ruas);
+            induk = ruas;
         }
+
+        // 3. Jari-Jari Tangan (Diberi Jarak Ekstra dari Pergelangan)
+        for (var ang of [-0.5, 0, 0.5]) {
+            var jari = new MyObject(GL, S.elipticParaboloid(0.035, 0.025, 0.34, MERAH));
+            LIBS.translateY(jari.MOVE_MATRIX, -(PANJANG_RUAS + GAP * 2));
+            LIBS.rotateZ(jari.MOVE_MATRIX, PI + ang * 0.9);
+            induk.childs.push(jari);
+        }
+        this.lengan.push({ sx: sx, ruas: ruasLengan });
+    }
 
         // ---------- KAKI : paha (cone) -> lutut (sphere) -> betis (cylinder) -> pergelangan (sphere) -> telapak (3 elliptic paraboloid) ----------
         this.kaki = [];

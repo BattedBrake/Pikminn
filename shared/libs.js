@@ -135,25 +135,36 @@ var LIBS = {
         m[12] = x, m[13] = y, m[14] = z;
     },
 
-    // ROTASI TERHADAP SUMBU SEMBARANG (rumus Rodrigues).
-    //   titik = [x, y, z] yang dilewati sumbu, arah = [x, y, z] arah sumbu (tidak harus sejajar X/Y/Z),
-    //   sudut = radian (positif = berlawanan jarum jam bila dilihat dari ujung arah sumbu).
-    // Hasil = T(titik) x R(arah, sudut) x T(-titik): geser ke pivot, putar, geser balik.
-    rotasiSumbu: function (titik, arah, sudut) {
-        var p = Math.sqrt(arah[0] * arah[0] + arah[1] * arah[1] + arah[2] * arah[2]) || 1;
-        var x = arah[0] / p, y = arah[1] / p, z = arah[2] / p;
-        var c = Math.cos(sudut), s = Math.sin(sudut), t = 1 - c;
-        var m = [
-            c + x * x * t,     x * y * t + z * s, x * z * t - y * s, 0,   // kolom 0
-            x * y * t - z * s, c + y * y * t,     y * z * t + x * s, 0,   // kolom 1
-            x * z * t + y * s, y * z * t - x * s, c + z * z * t,     0,   // kolom 2
-            0, 0, 0, 1,
+    // ROTASI SUMBU BEBAS (arbitrary axis): memutar sebesar `angle` (radian) mengelilingi garis lurus yang
+    // melewati titik `pivot` dengan arah `axis` (sembarang vektor, tidak harus sejajar X/Y/Z).
+    // Rumus Rodrigues untuk n = axis yang sudah dinormalkan, c = cos(angle), s = sin(angle), t = 1 - c:
+    //     R = [ t*nx*nx + c      t*nx*ny - s*nz   t*nx*nz + s*ny ]
+    //         [ t*nx*ny + s*nz   t*ny*ny + c      t*ny*nz - s*nx ]
+    //         [ t*nx*nz - s*ny   t*ny*nz + s*nx   t*nz*nz + c    ]
+    // Karena sumbunya lewat pivot (bukan titik asal), matriks akhirnya M = T(pivot) x R x T(-pivot),
+    // sehingga bagian translasinya = pivot - R x pivot. Hasil: matriks 4x4 baru (kolom-utama, seperti LIBS lain).
+    get_rotationArbitrary: function (axis, angle, pivot) {
+        var len = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]) || 1;
+        var x = axis[0] / len, y = axis[1] / len, z = axis[2] / len;
+        var c = Math.cos(angle), s = Math.sin(angle), t = 1 - c;
+        var r00 = t * x * x + c,     r01 = t * x * y - s * z, r02 = t * x * z + s * y;
+        var r10 = t * x * y + s * z, r11 = t * y * y + c,     r12 = t * y * z - s * x;
+        var r20 = t * x * z - s * y, r21 = t * y * z + s * x, r22 = t * z * z + c;
+        var p = pivot || [0, 0, 0];
+        return [
+            r00, r10, r20, 0,
+            r01, r11, r21, 0,
+            r02, r12, r22, 0,
+            p[0] - (r00 * p[0] + r01 * p[1] + r02 * p[2]),
+            p[1] - (r10 * p[0] + r11 * p[1] + r12 * p[2]),
+            p[2] - (r20 * p[0] + r21 * p[1] + r22 * p[2]),
+            1
         ];
-        // translasi = titik - R x titik  (supaya titik pada sumbu tidak bergeser)
-        m[12] = titik[0] - (m[0] * titik[0] + m[4] * titik[1] + m[8] * titik[2]);
-        m[13] = titik[1] - (m[1] * titik[0] + m[5] * titik[1] + m[9] * titik[2]);
-        m[14] = titik[2] - (m[2] * titik[0] + m[6] * titik[1] + m[10] * titik[2]);
-        return m;
+    },
+
+    // Sama dengan get_rotationArbitrary, urutan argumennya (titik, arah, sudut). Dipakai opsi orbit di shared/timeline.js.
+    rotasiSumbu: function (titik, arah, sudut) {
+        return LIBS.get_rotationArbitrary(arah, sudut, titik);
     }
 
     

@@ -30,6 +30,13 @@ function main() {
     });
     tulisSalin();
 
+    // Demo: berdiri sebentar, lalu rotasi sumbu bebas (putar) 1 kali, berulang terus.
+    rockPikmin.mainkanUrutan([
+        { animasi: "normal", durasi: 1.5 },
+        { animasi: ["normal", "putar"], durasi: 9, mulai: 1, periode: 7, kali: 1 },
+        { animasi: "normal", durasi: 1 },
+    ], { ulang: true });
+
     scene.run(function (shaderVars, root, time) {
         // telapak di y = 0 model; diturunkan & diperbesar supaya pas di layar
         rockPikmin.render(shaderVars, place(root, 0, -3.5, 0, 2), time);

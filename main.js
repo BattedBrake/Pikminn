@@ -37,9 +37,11 @@ import { melambai } from "./characters/wingedPikmin/animation/Melambai.js";
 // Animasi yang tersedia:
 //   red    : normal, jalan, tutupMata, melambai, kaget     (characters/redPikmin/RedPikmin.js)
 //   winged : normal, terbang, melambai, mengangguk, angkat, mataBergantian (characters/wingedPikmin/WingedPikmin.js)
-//   rock   : normal, jalan, melambai, kaget, tangis        (characters/rockPikmin/RockPikmin.js)
+//   rock   : normal, jalan, melambai, kaget, tangis, putar (characters/rockPikmin/RockPikmin.js)
 //   kaget  : pupil membesar. Pakai bersama animasi lain, misalnya ["normal", "kaget"].
 //            Pengaturan: pupil = ukuran pupil (default red 1.6, rock 1.35)
+//   putar  : Rock berputar mengelilingi garis MIRING di sampingnya (rotasi sumbu bebas, sumbu & pivot di config.js PUTAR).
+//            Pengaturan: kali (default 1), periode (detik per putaran, default 7), mulai (detik, default 1)
 //   tangis : badan Rock melebar lalu kembali beberapa kali, misalnya ["normal", "tangis"].
 //            Pengaturan: kali (default 3), periode (detik, default 1.2), mulai (detik, default 1), lebar (default 0.22)
 //   mataBergantian : mata Winged membesar-mengecil bergantian (kiri besar saat kanan kecil, lalu sebaliknya).
@@ -87,6 +89,7 @@ const DEPAN_TANGGA = KOPDES.z - 4.8 * KOPDES.skala;   // ujung tangga depan (z =
 // Titik akhir di depan rumah (sudah ditulis langsung sebagai angka di ADEGAN):
 //   red    [-12.2, 0, 137.06]   rock [-15.8, 0, 137.06]   : sejajar di depan tangga, kiri-kanan pintu
 //   winged [-9, 3.5, 135.56]                               : melayang di sisi kanan supaya tidak menutupi pintu & kunci
+//          (lalu di penutup naik ke [-14, 10, 133.06] dan mengelilingi titik tengah Red & Rock [-14, 137.06] dengan sumbu miring)
 //   kunci  [-14, 4.1, 144.07]                              : setinggi tengah pintu, 0.9 di depan daun pintu
 // Kalau KOPDES dipindah, titik-titik ini perlu disesuaikan juga.
 
@@ -101,7 +104,11 @@ const ADEGAN = {
         urutan: [
             { animasi: "jalan",     durasi: 10, ke: [42, 0, 3] },
             { animasi: "tutupMata", durasi: 8, hadap: 90 },
-            { animasi: "normal",    durasi: 5 },
+            // ARBITRARY AXIS: begitu selesai tutup mata, Red berjalan satu keliling penuh memutari pohon tempatnya menutup mata.
+            // Pohon (Hutan seed 10) ada di x = 46.49, z = 3.96, jadi sumbunya melewati pusat = [46.49, 3.96] (dihitung LIBS.rotasiSumbu).
+            // ke: ujung langkah sedikit lebih jauh dari batang (jari-jari 4.6 -> 5.5) sehingga lintasannya melebar seperti spiral
+            // dan Red tidak menabrak batang. Kalau seed/jumlah pohon diubah, pusat ini harus ikut diganti.
+            { animasi: "jalan",     durasi: 5, kecepatan: 10, ke: [41.11, 0, 2.81], orbit: { pusat: [46.49, 3.96], putaran: 360 } },
             { animasi: ["normal" , "melambai"],    durasi: 4 , hadap : -90 },
             { animasi: "jalan",     durasi: 3, ke: [-11, 0, 14] }, 
             { animasi: "melambai",    durasi: 3 },    
@@ -143,12 +150,18 @@ const ADEGAN = {
             { animasi: ["normal", "melambai"],  durasi: 1, ke: [-14,3,JARAK_WINGED_Z]},
             { animasi: "normal",                 durasi: 2.2 },
             { animasi: "terbang",                durasi: 40, ke: [-9, 3.5, 135.56] },
-            // penutup: menunggu Red & Rock sampai (1.6 detik lebih cepat), berbalik, lalu naik-turun sambil melambai
-            // dan berputar di tempat 3 kali (orbit dengan pusat = posisi Winged sendiri -> sumbu tegak menembus badannya)
+            // penutup: menunggu Red & Rock sampai (1.6 detik lebih cepat), naik ke atas mereka, lalu terbang cepat
+            // MENGELILINGI titik di tengah-tengah Red [-12.2, 137.06] & Rock [-15.8, 137.06] (rotasi sumbu bebas lewat orbit):
+            //   pusat [-14, 137.06], jari-jari 4, mulai setinggi 10 di atas tanah, 4 putaran dalam 12 detik (3 detik per putaran).
+            //   miring: 25 -> SUMBU PUTAR DIMIRINGKAN 25 derajat dari tegak, jadi lingkaran terbangnya miring:
+            //            naik sampai 10 + 4 x sin 25 (sekitar 11.7) di satu sisi dan turun ke sekitar 8.3 di sisi seberang
+            //            (tetap di atas kepala Red & Rock yang sedang melompat).
+            //   guling: -20 -> badan condong ke dalam lingkaran seperti pesawat yang membanking saat berbelok.
+            //   Winged otomatis menghadap arah terbangnya.
             { animasi: "terbang",                durasi: 1.6 },
-            { animasi: "terbang",                durasi: 1, hadap: 180 },
-            { animasi: ["terbang", "melambai", "mataBergantian"], durasi: 12, hadap: 180, lompat: { tinggi: 1.5, kali: 12 },
-              orbit: { pusat: [-9, 135.56], putaran: 1080 } },
+            { animasi: "terbang",                durasi: 1, ke: [-14, 10, 133.06] },
+            { animasi: ["terbang", "melambai", "mataBergantian"], durasi: 12, guling: -20,
+              orbit: { pusat: [-14, 137.06], putaran: 1440, miring: 25 } },
             { animasi: ["terbang", "melambai"],  durasi: 3, hadap: 180 },
 
         ],
@@ -165,15 +178,17 @@ const ADEGAN = {
             { animasi: ["normal", "tangis"], durasi: 15, miring : 90, kali: 3, periode: 1.2, mulai: 1, lebar: 0.22 },
             { animasi: "normal",   durasi: 2, miring : 0 , hadap : 90 },
             { animasi: "jalan",   durasi: 3, miring : 0, hadap : 90, ke: [-18,0,15]},
-            { animasi: "normal",   durasi: 7 },
-            // kaget: pupil membesar sejak peti mulai muncul (detik ke-43) sampai kunci selesai muncul (detik ke-56)
-            // lalu kembali ke ukuran normal. Ukuran bisa diubah lewat pupil: 1.35
-            { animasi: ["normal", "kaget"], durasi: 13 },
-            { animasi: ["normal", "kaget"],   durasi: 3, miring : -30,},
+            // ROTASI SUMBU BEBAS: Rock berputar 1 kali mengelilingi garis miring (detik ke-38 sampai 46, lihat Putar.js).
+            // Durasi langkah tetap 19 detik supaya jadwal adegan lain tidak bergeser.
+            { animasi: ["normal", "putar"], durasi: 19, mulai: 2, periode: 8, kali: 1 },
+            // kaget: pupil membesar mengikuti kunci yang muncul dari peti (detik ke-55 sampai ke-56),
+            // tetap besar sampai kunci mulai maju (detik ke-59), lalu kembali ke ukuran normal. Ukuran bisa diubah lewat pupil: 1.35
+            { animasi: ["normal", "kaget"], durasi: 1 },
+            { animasi: ["normal", "kaget"], durasi: 3, miring : -30, tahan: true},
             { animasi: "normal",    durasi: 2, miring : 0,},
             { animasi: "normal",    durasi: 1},
             { animasi: "normal",    durasi: 1.6, hadap :0},
-            { animasi: ["normal", "kaget"],    durasi: 0.1, ke: [-18,1,15]},
+            { animasi: "normal",    durasi: 0.1, ke: [-18,1,15]},
             { animasi: "normal",    durasi: 0.1, ke: [-18,0,15]},
             { animasi: "normal",    durasi: 2},
             { animasi: "jalan",    durasi: 40, ke: [-15.8, 0, 137.06] },

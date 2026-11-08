@@ -21,6 +21,7 @@ import { HeadAndBody } from "./bodyParts/HeadAndBody.js";
 import { Antenna } from "./bodyParts/Antenna.js";
 import { Limbs } from "./bodyParts/Limbs.js";
 import { PI, JUMLAH_RUAS, PANJANG_RUAS, SUDUT_AWAL, SUDUT_AKHIR, PANJANG_PAHA, PANJANG_BETIS, RUAS_SIKU } from "./config.js";
+import { tPose } from "./animation/TPose.js";
 
 import { poseBerdiri } from "./animation/Berdiri.js";
 import { jalan } from "./animation/Jalan.js";
@@ -37,6 +38,7 @@ export const DAFTAR_ANIMASI = {
     tutupMata: tutupMata,
     melambai: melambai,
     kaget: kaget,
+    tPose: tPose,
 };
 
 // Pernapasan: kecepatan (rad/detik, 2.2 = satu napas sekitar 2.9 detik) dan besar kembang-kempis badan
@@ -105,18 +107,14 @@ export class RedPikmin {
         LIBS.rotateY(m, p.badan.toleh);
         LIBS.set_position(m, 0, p.badan.naik, 0);
 
-        // Bernapas: badan (hanya bentuk badan, bukan anak-anaknya) mengembang-mengempis lewat POSITION_MATRIX.
-        // Melebar ke samping/depan sedikit lebih banyak daripada tinggi, seperti dada yang menarik napas.
-        var napas = Math.sin(performance.now() / 1000 * NAPAS_KECEPATAN) * p.badan.napas;
-        var bp = this.badan.POSITION_MATRIX;
-        LIBS.set_I4(bp);
-        LIBS.scale(bp, 1 + NAPAS_LEBAR * napas, 1 + NAPAS_TINGGI * napas, 1 + NAPAS_LEBAR * napas);
-
         // Pupil: diskalakan di bidang mata (x, y); ketebalan (z) tetap supaya tidak menembus bola mata
         this.pupil.forEach(function (pu) {
             LIBS.set_I4(pu.POSITION_MATRIX);
             LIBS.scale(pu.POSITION_MATRIX, p.mata.pupil, p.mata.pupil, 1);
         });
+
+        // Di dalam terapkanPose() pada RedPikmin.js
+        var GAP = 0; // Harus sama dengan GAP di Limbs.js
 
         this.lengan.forEach(function (l) {
             var q = p.lengan[l.sx < 0 ? "kiri" : "kanan"];
@@ -126,11 +124,11 @@ export class RedPikmin {
             LIBS.rotateX(bahu, q.bahuX);
             LIBS.set_position(bahu, l.sx * 0.55, 0.8, 0);
 
-            // Siku: tekukan dibagi rata ke beberapa ruas di tengah lengan supaya sikunya membulat
+            // Siku: tambahkan -GAP agar ruas siku tidak merapat kembali setiap frame!
             RUAS_SIKU.forEach(function (i) {
                 var r = l.ruas[i].MOVE_MATRIX;
                 LIBS.set_I4(r);
-                LIBS.translateY(r, -PANJANG_RUAS);
+                LIBS.translateY(r, -(PANJANG_RUAS + GAP)); // <-- Tambahkan + GAP di sini
                 LIBS.rotateZ(r, l.sx * (SUDUT_AKHIR - SUDUT_AWAL) / JUMLAH_RUAS * PI / 180);
                 LIBS.rotateX(r, -q.siku / RUAS_SIKU.length);
             });

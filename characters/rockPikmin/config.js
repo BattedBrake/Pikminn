@@ -35,3 +35,9 @@ export const MATERIAL = {
     kaki:     { kilap: 30, kekuatanKilap: 0.25 },   // juga lengan, tangan, dan sendi
     jariKaki: { kilap: 30, kekuatanKilap: 0.08 },
 };
+
+// ---- rotasi sumbu bebas (animasi "putar") ----
+// sumbu = arah garis putar (miring, tidak sejajar X/Y/Z), pivot = titik yang dilalui garis itu.
+// Keduanya dalam koordinat lokal karakter (titik asal = telapak kaki). Pivot di samping karakter,
+// jadi seluruh Rock mengorbit garis miring tersebut. Bentuk badan tidak diubah sama sekali.
+export const PUTAR = { sumbu: [0.12, 1, 0.08], pivot: [1.1, 0, 0] };

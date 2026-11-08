@@ -18,16 +18,17 @@
 import { Body } from "./bodyParts/Body.js";
 import { Antenna } from "./bodyParts/Antenna.js";
 import { Limbs } from "./bodyParts/Limbs.js";
-import { T, S, mul } from "./matrix.js";
+import { T, S, RA, mul } from "./matrix.js";
 import { resetMaterial } from "../../shared/renderer.js";
 import { Timeline } from "../../shared/timeline.js";
-import { L_LEG, FOOT_H, HIP_Y, SPLAY } from "./config.js";
+import { L_LEG, FOOT_H, HIP_Y, SPLAY, PUTAR } from "./config.js";
 
 import { goyangTangkai, poseIdle } from "./animation/Idle.js";
 import { jalan } from "./animation/Jalan.js";
 import { melambai } from "./animation/Melambai.js";
 import { kaget } from "./animation/Kaget.js";
 import { tangis } from "./animation/Tangis.js";
+import { putar } from "./animation/Putar.js";
 
 // Daftar animasi: dipakai setPose(nama) dan urutan.
 // Animasi baru: buat file di animation/, lalu daftarkan namanya di sini.
@@ -37,12 +38,13 @@ export const DAFTAR_ANIMASI = {
     melambai: melambai,
     kaget: kaget,
     tangis: tangis,
+    putar: putar,
 };
 
 // Pose dasar (radian): lengan.buka = membuka ke samping, lengan.ayun = ayun depan-belakang,
 // kaki.ayun = ayun di pinggul (telapak otomatis tetap datar)
 function poseKosong() {
-    var pose = { lengan: { buka: 0, ayun: 0 }, kaki: { ayun: 0 }, badan: { lebar: 0 }, mata: { pupil: 1 } };
+    var pose = { lengan: { buka: 0, ayun: 0 }, kaki: { ayun: 0 }, badan: { lebar: 0 }, mata: { pupil: 1 }, putar: { sudut: 0 } };
     poseIdle({ pose: pose });
     return pose;
 }
@@ -91,6 +93,12 @@ export class RockPikmin {
             // Tanpa urutan: animasi pilihan setPose berjalan terus
             this.pose = poseKosong();
             DAFTAR_ANIMASI[this.namaPose](this, 1, performance.now() / 1000, {});
+        }
+
+        // ROTASI SUMBU BEBAS (animasi "putar"): seluruh karakter diputar mengelilingi garis miring PUTAR.sumbu yang
+        // melewati titik PUTAR.pivot (bukan titik asal): parent x [T(pivot) x R(sumbu, sudut) x T(-pivot)].
+        if (this.pose.putar.sudut !== 0) {
+            parentMatrix = mul(parentMatrix, RA(PUTAR.sumbu, this.pose.putar.sudut, PUTAR.pivot));
         }
 
         // tinggi pusat badan supaya telapak kaki tepat di y = 0

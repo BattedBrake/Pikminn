@@ -6,7 +6,7 @@ function main() {
     var scene = createScene(document.getElementById("mycanvas"));
     if (!scene) return;
 
-    var redPikmin = new RedPikmin(scene.GL);
+    var redPikmin = new RedPikmin(scene.GL,"tPose");
 
     scene.run(function (shaderVars, root, time) {
         redPikmin.render(shaderVars, place(root, 0, -2, 0), time);
